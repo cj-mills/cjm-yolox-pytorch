@@ -1,0 +1,9 @@
+project:
+  output-dir: _docs
+
+website:
+  title: "cjm-yolox-pytorch"
+  site-url: "https://cj-mills.github.io/cjm-yolox-pytorch"
+  description: "A PyTorch implementation of the YOLOX object detection model based on the mmdetection implementation."
+  repo-branch: main
+  repo-url: "https://github.com/cj-mills/cjm-yolox-pytorch"
