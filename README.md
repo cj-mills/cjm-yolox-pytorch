@@ -10,6 +10,10 @@ pip install cjm_yolox_pytorch
 
 ## How to use
 
+``` python
+from cjm_yolox_pytorch.model import MODEL_TYPES, build_model
+```
+
 **Select model type**
 
 ``` python
