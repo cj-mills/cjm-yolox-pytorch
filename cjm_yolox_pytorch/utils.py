@@ -12,18 +12,17 @@ from functools import partial
 import urllib.request
 
 # %% ../nbs/01_utils.ipynb 6
-# Based on:
-# https://github.com/open-mmlab/mmdetection/blob/d64e719172335fa3d7a757a2a3636bd19e9efb62/mmdet/core/utils/misc.py#L11
-
-def multi_apply(func: Callable[..., Any], # Function to apply.
-                *args: Any, # Variable length argument list.
-                **kwargs: Any # Arbitrary keyword arguments.
+def multi_apply(func:Callable[..., Any], # Function to apply.
+                *args:Any,
+                **kwargs:Any
                ) -> Tuple[List[Any], ...]:
     """
     Applies the function `func` to each set of arguments in `*args`, 
     possibly using keyword arguments `**kwargs`.
     
+    Based on OpenMMLab's implementation in the mmdetection library:
     
+    - [OpenMMLab's Implementation](https://github.com/open-mmlab/mmdetection/blob/d64e719172335fa3d7a757a2a3636bd19e9efb62/mmdet/core/utils/misc.py#L11)
 
     """
     try:
