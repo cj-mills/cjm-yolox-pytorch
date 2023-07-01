@@ -10,6 +10,8 @@ from functools import partial
 # %% ../nbs/03_simota.ipynb 5
 import torch
 
+import torchvision
+
 # %% ../nbs/03_simota.ipynb 7
 class AssignResult():
     """
