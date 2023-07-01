@@ -13,6 +13,8 @@ import numpy as np
 import torch
 from torch.nn.modules.utils import _pair
 
+import torchvision
+
 # %% ../nbs/02_loss.ipynb 6
 from .utils import multi_apply
 from .simota import SimOTAAssigner
