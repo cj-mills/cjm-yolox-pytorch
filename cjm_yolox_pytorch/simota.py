@@ -9,7 +9,7 @@ from functools import partial
 
 # %% ../nbs/03_simota.ipynb 5
 import torch
-
+import torch.nn.functional as F
 import torchvision
 
 # %% ../nbs/03_simota.ipynb 7
