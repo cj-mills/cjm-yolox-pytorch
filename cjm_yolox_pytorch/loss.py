@@ -204,7 +204,7 @@ class YOLOXLoss:
         Returns:
             torch.Tensor: The decoded bounding boxes.
         """
-        # Calculate box centroids and sizes
+        # Calculate box centroids (geometric centers) and sizes
         box_centroids = (predicted_boxes[..., :2] * prior_boxes[:, 2:]) + prior_boxes[:, :2]
         box_sizes = torch.exp(predicted_boxes[..., 2:]) * prior_boxes[:, 2:]
 
