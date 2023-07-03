@@ -99,8 +99,8 @@ class SamplingResult:
     def __init__(self, 
                  positive_indices:np.array, # Indices of the positive samples.
                  negative_indices:np.array, # Indices of the negative samples.
-                 bounding_boxes:np.array, # Array containing all bounding boxes.
-                 ground_truth_bounding_boxes:torch.Tensor, # Tensor containing all ground truth bounding boxes.
+                 bboxes:np.array, # Array containing all bounding boxes.
+                 ground_truth_bboxes:torch.Tensor, # Tensor containing all ground truth bounding boxes.
                  assignment_result, # Object that contains the ground truth indices and labels corresponding to each sample.
                  ground_truth_flags:np.array # Array indicating which samples are ground truth.
                 ):
@@ -109,27 +109,27 @@ class SamplingResult:
         self.negative_indices = negative_indices
 
         # Bounding boxes for positive and negative samples
-        self.positive_bounding_boxes = bounding_boxes[positive_indices]
-        self.negative_bounding_boxes = bounding_boxes[negative_indices]
+        self.positive_bboxes = bboxes[positive_indices]
+        self.negative_bboxes = bboxes[negative_indices]
         
         # Flag indicating if the positive samples are ground truth
         self.is_positive_ground_truth = ground_truth_flags[positive_indices]
 
         # Number of ground truths
-        self.number_of_ground_truths = ground_truth_bounding_boxes.shape[0]
+        self.number_of_ground_truths = ground_truth_bboxes.shape[0]
         
         # Indices of the assigned ground truths for positive samples
         self.positive_assigned_ground_truth_indices = assignment_result.ground_truth_box_indices[positive_indices] - 1
 
         # Check the consistency of ground truth bounding boxes and assigned indices
-        if ground_truth_bounding_boxes.numel() == 0:
+        if ground_truth_bboxes.numel() == 0:
             if self.positive_assigned_ground_truth_indices.numel() != 0:
                 raise ValueError('Mismatch between ground truth bounding boxes and positive assigned ground truth indices.')
-            self.positive_ground_truth_bounding_boxes = torch.empty_like(ground_truth_bounding_boxes).view(-1, 4)
+            self.positive_ground_truth_bboxes = torch.empty_like(ground_truth_bboxes).view(-1, 4)
         else:
-            if len(ground_truth_bounding_boxes.shape) < 2:
-                ground_truth_bounding_boxes = ground_truth_bounding_boxes.view(-1, 4)
-            self.positive_ground_truth_bounding_boxes = ground_truth_bounding_boxes[self.positive_assigned_ground_truth_indices, :]
+            if len(ground_truth_bboxes.shape) < 2:
+                ground_truth_bboxes = ground_truth_bboxes.view(-1, 4)
+            self.positive_ground_truth_bboxes = ground_truth_bboxes[self.positive_assigned_ground_truth_indices, :]
 
         # If labels are assigned, assign labels for positive samples. Otherwise, set it as None
         if assignment_result.category_labels is not None:
@@ -147,7 +147,7 @@ class YOLOXLoss:
     - [OpenMMLab's Implementation](https://github.com/open-mmlab/mmdetection/blob/d64e719172335fa3d7a757a2a3636bd19e9efb62/mmdet/models/dense_heads/yolox_head.py#L321)
 
     #### Pseudocode
-    1. Receive class_scores, predicted_bounding_boxes, objectness_scores, ground_truth_bounding_boxes, and ground_truth_labels as input. These are all tensors.
+    1. Receive class_scores, predicted_bboxes, objectness_scores, ground_truth_bboxes, and ground_truth_labels as input. These are all tensors.
     2. Calculate the size of the feature maps from class scores.
     3. Create multi-level prior boxes using the feature map sizes.
     4. Reshape and flatten class predictions, bounding box predictions, and objectness scores. 
@@ -164,19 +164,29 @@ class YOLOXLoss:
     """
     def __init__(self, 
                  num_classes:int, # The number of target classes.
-                 bounding_box_loss_func, # The loss function to calculate the bounding box regression loss.
-                 class_loss_func, # The loss function to calculate the classification loss.
-                 objectness_loss_func, # The loss function to calculate the objectness loss.
-                 l1_loss_func, # The loss function to calculate the L1 loss.
+                 bbox_loss_weight:float=2.0, # The weight for the loss function to calculate the bounding box regression loss.
+                 class_loss_weight:float=1.0, # The weight for the loss function to calculate the classification loss.
+                 objectness_loss_weight:float=1.0, # The weight for the loss function to calculate the objectness loss.
+                 l1_loss_weight:float=1.0, # The weight for the loss function to calculate the L1 loss.
                  use_l1:bool=False, # Whether to use L1 loss in the calculation.
                  strides:List[int]=[8,16,32] # The list of strides.
                 ):
         
         self.num_classes = num_classes
-        self.bounding_box_loss_func = bounding_box_loss_func
-        self.class_loss_func = class_loss_func
-        self.objectness_loss_func = objectness_loss_func
-        self.l1_loss_func = l1_loss_func
+        
+        giou_loss_partial = partial(torchvision.ops.generalized_box_iou_loss, reduction='none', eps=1e-16)
+        self.bbox_loss_func = lambda bx1, bx2 : (1-(1-giou_loss_partial(boxes1=bx1, boxes2=bx2))**2).sum()
+        self.class_loss_func = partial(F.binary_cross_entropy_with_logits, reduction='sum')
+        self.objectness_loss_func = partial(F.binary_cross_entropy_with_logits, reduction='sum')
+        self.l1_loss_func = partial(F.l1_loss, reduction='sum')
+        
+        
+        self.bbox_loss_weight = bbox_loss_weight
+        self.class_loss_weight = class_loss_weight
+        self.objectness_loss_weight = objectness_loss_weight
+        self.l1_loss_weight = l1_loss_weight
+        
+        
         self.use_l1 = use_l1
         
         # Initialize the prior box generator and assigner
@@ -208,13 +218,13 @@ class YOLOXLoss:
         return decoded_boxes
 
 
-    def sample(self, assignment_result, bounding_boxes, ground_truth_boxes, **kwargs):
+    def sample(self, assignment_result, bboxes, ground_truth_boxes, **kwargs):
         """
         Samples positive and negative indices based on the assignment result.
         
         Args:
             assignment_result (Object): The assignment result obtained from assigner.
-            bounding_boxes (torch.Tensor): The predicted bounding boxes.
+            bboxes (torch.Tensor): The predicted bounding boxes.
             ground_truth_boxes (torch.Tensor): The ground truth boxes.
 
         Returns:
@@ -224,8 +234,8 @@ class YOLOXLoss:
             assignment_result.ground_truth_box_indices > 0, as_tuple=False).squeeze(-1).unique()
         negative_indices = torch.nonzero(
             assignment_result.ground_truth_box_indices == 0, as_tuple=False).squeeze(-1).unique()
-        ground_truth_flags = bounding_boxes.new_zeros(bounding_boxes.shape[0], dtype=torch.uint8)
-        sampling_result = SamplingResult(positive_indices, negative_indices, bounding_boxes, ground_truth_boxes,
+        ground_truth_flags = bboxes.new_zeros(bboxes.shape[0], dtype=torch.uint8)
+        sampling_result = SamplingResult(positive_indices, negative_indices, bboxes, ground_truth_boxes,
                                          assignment_result, ground_truth_flags)
         return sampling_result
 
@@ -249,8 +259,8 @@ class YOLOXLoss:
         return l1_target
 
 
-    def get_target_single(self, class_preds, objectness_score, prior_boxes, decoded_bounding_boxes,
-                           ground_truth_bounding_boxes, ground_truth_labels):
+    def get_target_single(self, class_preds, objectness_score, prior_boxes, decoded_bboxes,
+                           ground_truth_bboxes, ground_truth_labels):
         """
         Calculates the targets for a single image.
 
@@ -258,8 +268,8 @@ class YOLOXLoss:
             class_preds (torch.Tensor): The predicted class probabilities.
             objectness_score (torch.Tensor): The predicted objectness scores.
             prior_boxes (torch.Tensor): The prior bounding boxes.
-            decoded_bounding_boxes (torch.Tensor): The decoded bounding boxes.
-            ground_truth_bounding_boxes (torch.Tensor): The ground truth boxes.
+            decoded_bboxes (torch.Tensor): The decoded bounding boxes.
+            ground_truth_bboxes (torch.Tensor): The ground truth boxes.
             ground_truth_labels (torch.Tensor): The ground truth labels.
 
         Returns:
@@ -271,17 +281,17 @@ class YOLOXLoss:
         num_ground_truths = ground_truth_labels.size(0)
 
         # Match dtype of ground truth bounding boxes to the dtype of decoded bounding boxes
-        ground_truth_bounding_boxes = ground_truth_bounding_boxes.to(decoded_bounding_boxes.dtype)
+        ground_truth_bboxes = ground_truth_bboxes.to(decoded_bboxes.dtype)
 
         # Check if there are no ground truth labels (objects) in the image
         if num_ground_truths == 0:
             # Initialize targets as zero tensors, and foreground_mask as a boolean tensor with False values
             class_targets = class_preds.new_zeros((0, self.num_classes))
-            bounding_box_targets = class_preds.new_zeros((0, 4))
+            bbox_targets = class_preds.new_zeros((0, 4))
             l1_targets = class_preds.new_zeros((0, 4))
             objectness_targets = class_preds.new_zeros((num_prior_boxes, 1))
             foreground_mask = class_preds.new_zeros(num_prior_boxes).bool()
-            return (foreground_mask, class_targets, objectness_targets, bounding_box_targets,
+            return (foreground_mask, class_targets, objectness_targets, bbox_targets,
                     l1_targets, 0)  # Return zero for num_positive_per_image
 
         # Calculate the offset for the prior boxes
@@ -290,10 +300,10 @@ class YOLOXLoss:
         # Assign ground truth objects to prior boxes and get assignment results
         assignment_result = self.assigner.assign(
             class_preds.sigmoid() * objectness_score.unsqueeze(1).sigmoid(),
-            offset_prior_boxes, decoded_bounding_boxes, ground_truth_bounding_boxes, ground_truth_labels)
+            offset_prior_boxes, decoded_bboxes, ground_truth_bboxes, ground_truth_labels)
 
         # Use assignment results to sample prior boxes
-        sampling_result = self.sample(assignment_result, prior_boxes, ground_truth_bounding_boxes)
+        sampling_result = self.sample(assignment_result, prior_boxes, ground_truth_bboxes)
         
         # Get the indices of positive (object-containing) samples
         positive_indices = sampling_result.positive_indices
@@ -310,21 +320,21 @@ class YOLOXLoss:
         objectness_targets[positive_indices] = 1
 
         # Generate bounding box targets
-        bounding_box_targets = sampling_result.positive_ground_truth_bounding_boxes
+        bbox_targets = sampling_result.positive_ground_truth_bboxes
 
         # Initialize L1 targets as zeros
         l1_targets = class_preds.new_zeros((num_positive_per_image, 4))
 
         # If use_l1 is True, calculate L1 targets
         if self.use_l1:
-            l1_targets = self.get_l1_target(l1_targets, bounding_box_targets, prior_boxes[positive_indices])
+            l1_targets = self.get_l1_target(l1_targets, bbox_targets, prior_boxes[positive_indices])
 
         # Initialize foreground_mask as zeros and set the values at positive_indices to True
         foreground_mask = torch.zeros_like(objectness_score).to(torch.bool)
         foreground_mask[positive_indices] = 1
 
         # Return the computed targets, the foreground mask, and the number of positive samples per image
-        return (foreground_mask, class_targets, objectness_targets, bounding_box_targets, l1_targets, num_positive_per_image)
+        return (foreground_mask, class_targets, objectness_targets, bbox_targets, l1_targets, num_positive_per_image)
     
     
     def flatten_and_concat(self, tensors, num_images, reshape_dims=None):
@@ -332,16 +342,16 @@ class YOLOXLoss:
         return torch.cat([t.permute(0, 2, 3, 1).reshape(*new_shape) for t in tensors], dim=1)
 
     
-    def __call__(self, num_images, class_scores, predicted_bounding_boxes, objectness_scores, ground_truth_bounding_boxes, ground_truth_labels):
+    def __call__(self, num_images, class_scores, predicted_bboxes, objectness_scores, ground_truth_bboxes, ground_truth_labels):
         """
         Main method to compute the YOLOX loss.
 
         Args:
             num_images (int): The number of images in a batch.
             class_scores (List[torch.Tensor]): A list of class scores for each scale.
-            predicted_bounding_boxes (List[torch.Tensor]): A list of predicted bounding boxes for each scale.
+            predicted_bboxes (List[torch.Tensor]): A list of predicted bounding boxes for each scale.
             objectness_scores (List[torch.Tensor]): A list of objectness scores for each scale.
-            ground_truth_bounding_boxes (List[torch.Tensor]): A list of ground truth bounding boxes for each image.
+            ground_truth_bboxes (List[torch.Tensor]): A list of ground truth bounding boxes for each image.
             ground_truth_labels (List[torch.Tensor]): A list of ground truth labels for each image.
 
         Returns:
@@ -356,20 +366,20 @@ class YOLOXLoss:
         
         # Flatten and concatenate class predictions, bounding box predictions, and objectness scores
         flatten_class_preds = self.flatten_and_concat(class_scores, num_images, self.num_classes)
-        flatten_bounding_box_preds = self.flatten_and_concat(predicted_bounding_boxes, num_images, 4)
+        flatten_bbox_preds = self.flatten_and_concat(predicted_bboxes, num_images, 4)
         flatten_objectness_scores = self.flatten_and_concat(objectness_scores, num_images)
                     
         # Concatenate and decode prior boxes
         flatten_prior_boxes = torch.cat(multilevel_prior_boxes)
-        flatten_decoded_bounding_boxes = self.bbox_decode(flatten_prior_boxes, flatten_bounding_box_preds)
+        flatten_decoded_bboxes = self.bbox_decode(flatten_prior_boxes, flatten_bbox_preds)
 
         # Compute targets
-        (positive_masks, class_targets, objectness_targets, bounding_box_targets, l1_targets,
+        (positive_masks, class_targets, objectness_targets, bbox_targets, l1_targets,
          num_positive_images) = multi_apply(
              self.get_target_single, flatten_class_preds.detach(),
              flatten_objectness_scores.detach(),
              flatten_prior_boxes.unsqueeze(0).repeat(num_images, 1, 1),
-             flatten_decoded_bounding_boxes.detach(), ground_truth_bounding_boxes, ground_truth_labels)
+             flatten_decoded_bboxes.detach(), ground_truth_bboxes, ground_truth_labels)
 
         # Calculate total number of samples
         num_total_samples = max(sum(num_positive_images), 1)
@@ -378,16 +388,16 @@ class YOLOXLoss:
         positive_masks = torch.cat(positive_masks, 0)
         class_targets = torch.cat(class_targets, 0)
         objectness_targets = torch.cat(objectness_targets, 0)
-        bounding_box_targets = torch.cat(bounding_box_targets, 0)
+        bbox_targets = torch.cat(bbox_targets, 0)
 
         # If use_l1 is True, concatenate l1 targets
         if self.use_l1:
             l1_targets = torch.cat(l1_targets, 0)
 
         # Compute bounding box loss
-        loss_bbox = self.bounding_box_loss_func(
-            flatten_decoded_bounding_boxes.view(-1, 4)[positive_masks],
-            bounding_box_targets) / num_total_samples
+        loss_bbox = self.bbox_loss_func(
+            flatten_decoded_bboxes.view(-1, 4)[positive_masks],
+            bbox_targets) / num_total_samples
 
         # Compute objectness loss
         loss_obj = self.objectness_loss_func(flatten_objectness_scores.view(-1, 1),
@@ -397,6 +407,12 @@ class YOLOXLoss:
         loss_cls = self.class_loss_func(
             flatten_class_preds.view(-1, self.num_classes)[positive_masks],
             class_targets) / num_total_samples
+                
+        # Scale losses
+        loss_bbox *= self.bbox_loss_weight
+        loss_obj *= self.objectness_loss_weight
+        loss_cls *= self.class_loss_weight
+        
 
         # Initialize loss dictionary
         loss_dict = dict(loss_cls=loss_cls, loss_bbox=loss_bbox, loss_obj=loss_obj)
@@ -404,8 +420,9 @@ class YOLOXLoss:
         # If use_l1 is True, compute L1 loss and add it to the loss dictionary
         if self.use_l1:
             loss_l1 = self.l1_loss_func(
-                flatten_bounding_box_preds.view(-1, 4)[positive_masks],
+                flatten_bbox_preds.view(-1, 4)[positive_masks],
                 l1_targets) / num_total_samples
+            loss_l1 *= self.l1_loss_weight
             loss_dict.update(loss_l1=loss_l1)
 
         # Return loss dictionary
