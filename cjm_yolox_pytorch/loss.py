@@ -40,32 +40,29 @@ class MlvlPointGenerator:
         """int: number of feature levels that the generator will be applied."""
         return len(self.strides)
 
-    def grid_priors(self, featmap_sizes: List[Tuple[int, int]], device: str = 'cuda', with_stride: bool = False) -> List[torch.Tensor]:
+    def grid_priors(self, featmap_sizes: List[Tuple[int, int]], with_stride: bool = False) -> List[torch.Tensor]:
         """Generate grid points of multiple feature levels.
 
         Args:
             featmap_sizes (List[Tuple[int, int]]): List of feature map sizes in multiple feature levels, each size arrange as as (h, w).
-            device (str): The device where the anchors will be put on.
             with_stride (bool): Whether to concatenate the stride to the last dimension of points.
 
         Return:
             list[torch.Tensor]: Points of multiple feature levels.
         """
         assert self.num_levels == len(featmap_sizes)
-        multi_level_priors = [self.single_level_grid_priors(featmap_sizes[i], i, device, with_stride) for i in range(self.num_levels)]
+        multi_level_priors = [self.single_level_grid_priors(featmap_sizes[i], i, with_stride) for i in range(self.num_levels)]
         return multi_level_priors
 
     def single_level_grid_priors(self,
                                  featmap_size: Tuple[int, int],
                                  level_idx: int,
-                                 device: str = 'cuda',
                                  with_stride: bool = False) -> torch.Tensor:
         """Generate grid Points of a single level.
 
         Args:
             featmap_size (Tuple[int, int]): Size of the feature maps, arrange as (h, w).
             level_idx (int): The index of corresponding feature map level.
-            device (str, optional): The device the tensor will be put on. Defaults to 'cuda'.
             with_stride (bool): Concatenate the stride to the last dimension of points.
 
         Return:
@@ -73,8 +70,8 @@ class MlvlPointGenerator:
         """
         feat_h, feat_w = featmap_size
         stride = self.strides[level_idx]
-        shift_x = (torch.arange(0., feat_w, device=device) + self.offset) * stride
-        shift_y = (torch.arange(0., feat_h, device=device) + self.offset) * stride
+        shift_x = (torch.arange(0., feat_w) + self.offset) * stride
+        shift_y = (torch.arange(0., feat_h) + self.offset) * stride
         shift_xx, shift_yy = torch.meshgrid(shift_x, shift_y, indexing='xy')
         shift_xx, shift_yy = shift_xx.flatten(), shift_yy.flatten()
 
@@ -83,7 +80,7 @@ class MlvlPointGenerator:
         else:
             shifts = torch.stack([shift_xx, shift_yy], dim=-1)
         
-        return shifts.to(device)
+        return shifts
 
 # %% ../nbs/02_loss.ipynb 9
 class SamplingResult:
@@ -361,7 +358,7 @@ class YOLOXLoss:
 
         # Generate multi-level priors
         multilevel_prior_boxes = self.prior_generator.grid_priors(
-            feature_map_sizes, class_scores[0].device, with_stride=True)
+            feature_map_sizes, with_stride=True).to(class_scores[0].device)
         
         # Flatten and concatenate class predictions, bounding box predictions, and objectness scores
         flatten_class_preds = self.flatten_and_concat(class_scores, num_images, self.num_classes)
