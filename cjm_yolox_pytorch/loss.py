@@ -82,7 +82,7 @@ class MlvlPointGenerator:
         shift_xx, shift_yy = shift_xx.flatten(), shift_yy.flatten()
 
         if with_stride:
-            shifts = torch.stack([shift_xx, shift_yy, torch.full_like(shift_xx, stride_w), torch.full_like(shift_yy, stride_h)], dim=-1)
+            shifts = torch.stack([shift_xx, shift_yy, torch.full_like(shift_xx, stride), torch.full_like(shift_yy, stride)], dim=-1)
         else:
             shifts = torch.stack([shift_xx, shift_yy], dim=-1)
         
