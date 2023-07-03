@@ -34,6 +34,7 @@ class MlvlPointGenerator:
                  offset:float = 0.5 # The offset of points, the value is normalized with corresponding stride.
                 ):
         self.strides = [_pair(stride) for stride in strides]
+        self.strides = strides
         self.offset = offset
 
     @property
@@ -73,9 +74,10 @@ class MlvlPointGenerator:
             torch.Tensor: Points of single feature levels.
         """
         feat_h, feat_w = featmap_size
-        stride_w, stride_h = self.strides[level_idx]
-        shift_x = (torch.arange(0., feat_w, device=device) + self.offset) * stride_w
-        shift_y = (torch.arange(0., feat_h, device=device) + self.offset) * stride_h
+#         stride_w, stride_h = self.strides[level_idx]
+        stride = self.strides[level_idx]
+        shift_x = (torch.arange(0., feat_w, device=device) + self.offset) * stride
+        shift_y = (torch.arange(0., feat_h, device=device) + self.offset) * stride
         shift_xx, shift_yy = torch.meshgrid(shift_x, shift_y, indexing='xy')
         shift_xx, shift_yy = shift_xx.flatten(), shift_yy.flatten()
 
