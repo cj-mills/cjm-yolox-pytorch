@@ -366,7 +366,7 @@ class YOLOXLoss:
         flatten_objectness_scores = self.flatten_and_concat(objectness_scores, num_images)
                     
         # Concatenate and decode prior boxes
-        flatten_prior_boxes = torch.cat(multilevel_prior_boxes).to(class_scores[0].device)
+        flatten_prior_boxes = torch.cat(multilevel_prior_boxes).to(flatten_bbox_preds.device)
         flatten_decoded_bboxes = self.bbox_decode(flatten_prior_boxes, flatten_bbox_preds)
 
         # Compute targets
