@@ -3,23 +3,22 @@
 # %% auto 0
 __all__ = ['MlvlPointGenerator', 'SamplingResult', 'YOLOXLoss']
 
-# %% ../nbs/02_loss.ipynb 4
+# %% ../nbs/02_loss.ipynb 3
 from typing import Any, Type, List, Optional, Callable, Tuple, Union
 from functools import partial
 
-# %% ../nbs/02_loss.ipynb 5
+# %% ../nbs/02_loss.ipynb 4
 import numpy as np
 
 import torch
-from torch.nn.modules.utils import _pair
 import torch.nn.functional as F
 import torchvision
 
-# %% ../nbs/02_loss.ipynb 6
+# %% ../nbs/02_loss.ipynb 5
 from .utils import multi_apply
 from .simota import SimOTAAssigner
 
-# %% ../nbs/02_loss.ipynb 8
+# %% ../nbs/02_loss.ipynb 7
 class MlvlPointGenerator:
     """Standard points generator for multi-level (Mlvl) feature maps in 2D points-based detectors.
     
@@ -33,7 +32,6 @@ class MlvlPointGenerator:
                  strides:List[Union[int, Tuple[int, int]]], # Strides of anchors in multiple feature levels in order (w, h).
                  offset:float = 0.5 # The offset of points, the value is normalized with corresponding stride.
                 ):
-        self.strides = [_pair(stride) for stride in strides]
         self.strides = strides
         self.offset = offset
 
@@ -74,7 +72,6 @@ class MlvlPointGenerator:
             torch.Tensor: Points of single feature levels.
         """
         feat_h, feat_w = featmap_size
-#         stride_w, stride_h = self.strides[level_idx]
         stride = self.strides[level_idx]
         shift_x = (torch.arange(0., feat_w, device=device) + self.offset) * stride
         shift_y = (torch.arange(0., feat_h, device=device) + self.offset) * stride
@@ -88,7 +85,7 @@ class MlvlPointGenerator:
         
         return shifts.to(device)
 
-# %% ../nbs/02_loss.ipynb 10
+# %% ../nbs/02_loss.ipynb 9
 class SamplingResult:
     """
     Bounding box sampling result.
@@ -139,7 +136,7 @@ class SamplingResult:
         else:
             self.positive_ground_truth_labels = None
 
-# %% ../nbs/02_loss.ipynb 12
+# %% ../nbs/02_loss.ipynb 11
 class YOLOXLoss:
     """
     YOLOXLoss class implements the loss function used in the YOLOX model. 
