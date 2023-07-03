@@ -358,7 +358,7 @@ class YOLOXLoss:
 
         # Generate multi-level priors
         multilevel_prior_boxes = self.prior_generator.grid_priors(
-            feature_map_sizes, with_stride=True)#.to(class_scores[0].device)
+            feature_map_sizes, with_stride=True)
         
         # Flatten and concatenate class predictions, bounding box predictions, and objectness scores
         flatten_class_preds = self.flatten_and_concat(class_scores, num_images, self.num_classes)
@@ -366,7 +366,7 @@ class YOLOXLoss:
         flatten_objectness_scores = self.flatten_and_concat(objectness_scores, num_images)
                     
         # Concatenate and decode prior boxes
-        flatten_prior_boxes = torch.cat(multilevel_prior_boxes)
+        flatten_prior_boxes = torch.cat(multilevel_prior_boxes).to(class_scores[0].device)
         flatten_decoded_bboxes = self.bbox_decode(flatten_prior_boxes, flatten_bbox_preds)
 
         # Compute targets
