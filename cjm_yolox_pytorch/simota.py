@@ -47,7 +47,7 @@ class SimOTAAssigner():
     #### Pseudocode
 
     1. Receive as input: predicted_scores, priors, decoded_bounding_boxes, ground_truth_bounding_boxes, and ground_truth_labels. These are all tensors.
-    2. Initialize a large value for INF.
+    2. Initialize a large value for HIGH_COST_VALUE.
     3. Calculate the number of ground truth bounding boxes and predicted bounding boxes.
     4. Create a tensor `assigned_gt_inds` with the same size as the number of predicted bounding boxes and fill it with zeros. 
     5. If there are no ground truth bounding boxes or predicted bounding boxes, return an `AssignResult` with no assignments.
@@ -63,7 +63,7 @@ class SimOTAAssigner():
     13. Update the `assigned_gt_inds` with the matched ground truth indices.
     14. Create a tensor `assigned_labels` of the same size as `assigned_gt_inds`, and fill it with -1.
         - Update `assigned_labels` with the labels of the matched ground truth boxes.
-    15. Create a tensor `max_overlaps` of the same size as `assigned_gt_inds`, and fill it with -INF.
+    15. Create a tensor `max_overlaps` of the same size as `assigned_gt_inds`, and fill it with -HIGH_COST_VALUE.
         - Update `max_overlaps` with the IoU scores of the matched ground truth boxes.
     16. Return an instance of `AssignResult` with the number of ground truth boxes, the `assigned_gt_inds`, `max_overlaps`, and `assigned_labels`.
     
@@ -115,7 +115,7 @@ class SimOTAAssigner():
                 of the ground truth box each prediction is assigned to, the IoU between the 
                 predictions and their assigned ground truth, and the category labels for each prediction.
         """
-        INF = 100000000
+        HIGH_COST_VALUE = 100000000
         num_gt = gt_bboxes.size(0)
         num_bboxes = decoded_bboxes.size(0)
 
@@ -152,8 +152,8 @@ class SimOTAAssigner():
         cls_cost = F.binary_cross_entropy(valid_pred_scores.sqrt_(), gt_onehot_label, reduction='none').sum(-1)
 
         # Calculate total cost matrix by combining classification and IoU costs, 
-        # and assign a high cost (INF) for bboxes not in both boxes and centers
-        cost_matrix = cls_cost * self.cls_weight + iou_cost * self.iou_weight + (~is_in_boxes_and_center) * INF
+        # and assign a high cost (HIGH_COST_VALUE) for bboxes not in both boxes and centers
+        cost_matrix = cls_cost * self.cls_weight + iou_cost * self.iou_weight + (~is_in_boxes_and_center) * HIGH_COST_VALUE
 
         # Perform matching between ground truth and valid bounding boxes based on the cost matrix
         matched_pred_ious, matched_gt_inds = self.dynamic_k_matching(cost_matrix, pairwise_ious, num_gt, valid_mask)
@@ -162,7 +162,7 @@ class SimOTAAssigner():
         assigned_gt_inds[valid_mask] = matched_gt_inds + 1
         assigned_labels = assigned_gt_inds.new_full((num_bboxes, ), -1)
         assigned_labels[valid_mask] = gt_labels[matched_gt_inds].long()
-        max_overlaps = assigned_gt_inds.new_full((num_bboxes, ), -INF, dtype=torch.float32)
+        max_overlaps = assigned_gt_inds.new_full((num_bboxes, ), -HIGH_COST_VALUE, dtype=torch.float32)
         max_overlaps[valid_mask] = matched_pred_ious
         return AssignResult(num_gt, assigned_gt_inds, max_overlaps, category_labels=assigned_labels)
 
