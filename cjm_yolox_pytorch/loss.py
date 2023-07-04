@@ -121,8 +121,7 @@ class YOLOXLoss:
         
         self.use_l1 = use_l1
         
-        # Initialize the prior box generator and assigner
-#         self.prior_generator = MlvlPointGenerator(strides, offset=0)
+        # Initialize the assigner
         self.assigner = SimOTAAssigner(center_radius=2.5)
         
         self.strides = strides
@@ -292,22 +291,10 @@ class YOLOXLoss:
         Returns:
             Dict: A dictionary with the classification, bounding box, objectness, and optionally, L1 loss.
         """
-        # Compute feature map sizes from class scores
-#         feature_map_sizes = [class_score.shape[2:] for class_score in class_scores]
-    
-        # Generate multi-level priors
-#         multilevel_prior_boxes = self.prior_generator.grid_priors(
-#             feature_map_sizes, with_stride=True)
-#         multilevel_prior_boxes = torch.cat(multilevel_prior_boxes)
-#         print(multilevel_prior_boxes.shape)
-#         print(multilevel_prior_boxes)
-        
         
         multilevel_prior_boxes = generate_grid_priors(*[s*8 for s in class_scores[0].shape[-2:]], self.strides)
         multilevel_prior_boxes[:, :2] *= multilevel_prior_boxes[:, 2].unsqueeze(1)
         flatten_prior_boxes = torch.cat([multilevel_prior_boxes, multilevel_prior_boxes[:, 2:].clone()], dim=1)
-#         print(flatten_prior_boxes.shape)
-#         print(flatten_prior_boxes)
         
         # Flatten and concatenate class predictions, bounding box predictions, and objectness scores
         flatten_class_preds = self.flatten_and_concat(class_scores, num_images, self.num_classes)
@@ -315,7 +302,6 @@ class YOLOXLoss:
         flatten_objectness_scores = self.flatten_and_concat(objectness_scores, num_images)
                     
         # Concatenate and decode box predictions
-#         flatten_prior_boxes = torch.cat(multilevel_prior_boxes).to(flatten_bbox_preds.device)
         flatten_prior_boxes = flatten_prior_boxes.to(flatten_bbox_preds.device)
         flatten_decoded_bboxes = self.bbox_decode(flatten_prior_boxes, flatten_bbox_preds)
 
