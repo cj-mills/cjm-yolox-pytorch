@@ -324,23 +324,21 @@ class YOLOXLoss:
             l1_targets = torch.cat(l1_targets, 0)
 
         # Compute bounding box loss
-        loss_bbox = self.bbox_loss_func(
-            flatten_decoded_bboxes.view(-1, 4)[positive_masks],
-            bbox_targets) / num_total_samples
+        loss_bbox = self.bbox_loss_func(flatten_decoded_bboxes.view(-1, 4)[positive_masks], bbox_targets)# / num_total_samples
 
         # Compute objectness loss
-        loss_obj = self.objectness_loss_func(flatten_objectness_scores.view(-1, 1),
-                                 objectness_targets) / num_total_samples
+        loss_obj = self.objectness_loss_func(flatten_objectness_scores.view(-1, 1), objectness_targets)# / num_total_samples
 
         # Compute class loss
-        loss_cls = self.class_loss_func(
-            flatten_class_preds.view(-1, self.num_classes)[positive_masks],
-            class_targets) / num_total_samples
+        loss_cls = self.class_loss_func(flatten_class_preds.view(-1, self.num_classes)[positive_masks],class_targets)# / num_total_samples
                 
         # Scale losses
-        loss_bbox *= self.bbox_loss_weight
-        loss_obj *= self.objectness_loss_weight
-        loss_cls *= self.class_loss_weight
+#         loss_bbox *= self.bbox_loss_weight
+        loss_bbox = (loss_bbox / num_total_samples) * self.bbox_loss_weight
+#         loss_obj *= self.objectness_loss_weight
+        loss_obj = (loss_obj / num_total_samples) * self.objectness_loss_weight
+#         loss_cls *= self.class_loss_weight
+        loss_cls = (loss_cls / num_total_samples) * self.class_loss_weight
         
         # Initialize loss dictionary
         loss_dict = dict(loss_cls=loss_cls, loss_bbox=loss_bbox, loss_obj=loss_obj)
