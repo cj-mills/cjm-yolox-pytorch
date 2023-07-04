@@ -94,7 +94,7 @@ class YOLOXLoss:
     """
     def __init__(self, 
                  num_classes:int, # The number of target classes.
-                 bbox_loss_weight:float=2.0, # The weight for the loss function to calculate the bounding box regression loss.
+                 bbox_loss_weight:float=5.0, # The weight for the loss function to calculate the bounding box regression loss.
                  class_loss_weight:float=1.0, # The weight for the loss function to calculate the classification loss.
                  objectness_loss_weight:float=1.0, # The weight for the loss function to calculate the objectness loss.
                  l1_loss_weight:float=1.0, # The weight for the loss function to calculate the L1 loss.
@@ -329,9 +329,9 @@ class YOLOXLoss:
         loss_cls = self.class_loss_func(flatten_class_preds.view(-1, self.num_classes)[positive_masks],class_targets)
                 
         # Scale losses
-        loss_bbox = (loss_bbox / num_total_samples) * self.bbox_loss_weight
-        loss_obj = (loss_obj / num_total_samples) * self.objectness_loss_weight
-        loss_cls = (loss_cls / num_total_samples) * self.class_loss_weight
+        loss_bbox = (loss_bbox * self.bbox_loss_weight) / num_total_samples
+        loss_obj = (loss_obj * self.objectness_loss_weight) / num_total_samples
+        loss_cls = (loss_cls * self.class_loss_weight) / num_total_samples
         
         # Initialize loss dictionary
         loss_dict = dict(loss_cls=loss_cls, loss_bbox=loss_bbox, loss_obj=loss_obj)
