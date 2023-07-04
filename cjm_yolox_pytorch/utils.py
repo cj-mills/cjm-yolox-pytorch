@@ -11,7 +11,10 @@ from functools import partial
 
 import urllib.request
 
-# %% ../nbs/01_utils.ipynb 6
+# %% ../nbs/01_utils.ipynb 5
+import torch
+
+# %% ../nbs/01_utils.ipynb 7
 def multi_apply(func:Callable[..., Any], # Function to apply.
                 *args:Any,
                 **kwargs:Any
@@ -33,7 +36,7 @@ def multi_apply(func:Callable[..., Any], # Function to apply.
         print(f"Error occurred: {str(e)}")
         return ()
 
-# %% ../nbs/01_utils.ipynb 9
+# %% ../nbs/01_utils.ipynb 10
 def download_file(url:str, # The URL of the file to download. It should be a string containing a valid URL.
                   destination:str, # The path where the file will be saved. This should include the filename and extension as well.
                   overwrite:bool=False # Determines if the file should be overwritten if it already exists at the destination.
@@ -60,7 +63,7 @@ def download_file(url:str, # The URL of the file to download. It should be a str
             # Print an error message if the download fails
             print(f"An error occurred while downloading the file: {e}")
 
-# %% ../nbs/01_utils.ipynb 11
+# %% ../nbs/01_utils.ipynb 12
 def generate_grid_priors(height, width, strides=[8,16,32]):
         """
         Generate a tensor containing grid coordinates and strides for a given height and width.
