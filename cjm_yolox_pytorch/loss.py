@@ -79,20 +79,18 @@ class YOLOXLoss:
     - [OpenMMLab's Implementation](https://github.com/open-mmlab/mmdetection/blob/d64e719172335fa3d7a757a2a3636bd19e9efb62/mmdet/models/dense_heads/yolox_head.py#L321)
 
     #### Pseudocode
-    1. Receive class_scores, predicted_bboxes, objectness_scores, ground_truth_bboxes, and ground_truth_labels as input. These are all tensors.
-    2. Calculate the size of the feature maps from class scores.
-    3. Create multi-level prior boxes using the feature map sizes.
-    4. Reshape and flatten class predictions, bounding box predictions, and objectness scores. 
-    5. Combine the class predictions, bounding box predictions, and objectness scores from different levels into one tensor respectively.
-    6. Combine the prior boxes from different levels into one tensor and decode the bounding boxes using these prior boxes and bounding box predictions.
-    7. For each image, calculate the targets for classification, bounding box, objectness, and optionally, L1 loss.
-    8. Determine the total number of positive samples.
-    9. Combine the masks, class targets, objectness targets, and bounding box targets from different images into one tensor respectively.
-    10. Calculate the bounding box loss, objectness loss, and class loss using the respective targets and predictions.
-        - If L1 loss is enabled, calculate the L1 loss using the bounding box predictions and L1 targets.
-    11. Return a dictionary containing the classification, bounding box, objectness, and optionally, L1 loss.
-    
-    
+    1. Generate the grid of prior boxes by calling the `generate_grid_priors` function with arguments based on the shape of class scores and strides.
+    2. Update the centroids of the prior boxes based on their widths and heights.
+    3. Flatten the predicted class scores, bounding box predictions, and objectness scores across all scales and concatenate them. This is done by calling the `flatten_and_concat` method for each of these predictions.
+    4. Decode the predicted bounding boxes by calling the `bbox_decode` method, which calculates the actual coordinates of the predicted boxes based on the prior boxes and the predicted bounding box transformations.
+    5. For each image in the batch, compute the targets for classification, bounding box regression, objectness, and optionally, L1 regression. This is done by calling the `get_target_single` method, which matches prior boxes to ground truth boxes, samples positive and negative boxes, and then computes the targets. 
+    6. Calculate the total number of positive samples across all images in the batch.
+    7. Concatenate all the computed targets across all images.
+    8. If the `use_l1` flag is set to `True`, concatenate the computed L1 targets across all images.
+    9. Compute the bounding box, objectness, and class losses by comparing the predictions with the targets. 
+    10. Multiply the computed losses by their respective weights.
+    11. Create a dictionary to store the computed losses.
+        
     """
     def __init__(self, 
                  num_classes:int, # The number of target classes.
@@ -292,6 +290,7 @@ class YOLOXLoss:
             Dict: A dictionary with the classification, bounding box, objectness, and optionally, L1 loss.
         """
         
+        # Generate prior box coordinates for all anchors.
         grid_priors = generate_grid_priors(*[s*self.strides[0] for s in class_scores[0].shape[-2:]], self.strides)
         grid_priors[:, :2] *= grid_priors[:, 2].unsqueeze(1)
         flatten_prior_boxes = torch.cat([grid_priors, grid_priors[:, 2:].clone()], dim=1)
