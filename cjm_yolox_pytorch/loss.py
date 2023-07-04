@@ -36,19 +36,19 @@ class SamplingResult:
                  assignment_result, # Object that contains the ground truth indices and labels corresponding to each sample.
                  ground_truth_flags:np.array # Array indicating which samples are ground truth.
                 ):
-#         # Indices of positive and negative samples
-#         self.positive_indices = positive_indices
-#         self.negative_indices = negative_indices
+        # Indices of positive and negative samples
+        self.positive_indices = positive_indices
+        self.negative_indices = negative_indices
 
-#         # Bounding boxes for positive and negative samples
-#         self.positive_bboxes = bboxes[positive_indices]
-#         self.negative_bboxes = bboxes[negative_indices]
+        # Bounding boxes for positive and negative samples
+        self.positive_bboxes = bboxes[positive_indices]
+        self.negative_bboxes = bboxes[negative_indices]
         
-#         # Flag indicating if the positive samples are ground truth
-#         self.is_positive_ground_truth = ground_truth_flags[positive_indices]
+        # Flag indicating if the positive samples are ground truth
+        self.is_positive_ground_truth = ground_truth_flags[positive_indices]
 
-#         # Number of ground truths
-#         self.number_of_ground_truths = ground_truth_bboxes.shape[0]
+        # Number of ground truths
+        self.number_of_ground_truths = ground_truth_bboxes.shape[0]
         
         # Indices of the assigned ground truths for positive samples
         self.positive_assigned_ground_truth_indices = assignment_result.ground_truth_box_indices[positive_indices] - 1
