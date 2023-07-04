@@ -84,12 +84,12 @@ class YOLOXLoss:
     3. Flatten the predicted class scores, bounding box predictions, and objectness scores across all scales and concatenate them. This is done by calling the `flatten_and_concat` method for each of these predictions.
     4. Decode the predicted bounding boxes by calling the `bbox_decode` method, which calculates the actual coordinates of the predicted boxes based on the prior boxes and the predicted bounding box transformations.
     5. For each image in the batch, compute the targets for classification, bounding box regression, objectness, and optionally, L1 regression. This is done by calling the `get_target_single` method, which matches prior boxes to ground truth boxes, samples positive and negative boxes, and then computes the targets. 
-    6. Calculate the total number of positive samples across all images in the batch.
-    7. Concatenate all the computed targets across all images.
-    8. If the `use_l1` flag is set to `True`, concatenate the computed L1 targets across all images.
-    9. Compute the bounding box, objectness, and class losses by comparing the predictions with the targets. 
-    10. Multiply the computed losses by their respective weights.
-    11. Create a dictionary to store the computed losses.
+    6. Concatenate all the computed targets across all images.
+    7. Compute the bounding box, objectness, and class losses by comparing the predictions with the targets. 
+    8. Calculate the total number of positive samples across all images in the batch.
+    9. Scale the computed losses using their respective weights and the total number of samples.
+    10. Create a dictionary to store the computed losses.
+    11. If use_l1 is True, concatenate l1 targets, compute L1 loss and add it to the loss dictionary.
         
     """
     def __init__(self, 
@@ -310,9 +310,6 @@ class YOLOXLoss:
              flatten_prior_boxes.unsqueeze(0).repeat(num_images, 1, 1),
              flatten_decoded_bboxes.detach(), ground_truth_bboxes, ground_truth_labels)
 
-        # Calculate total number of samples
-        num_total_samples = max(sum(num_positive_images), 1)
-
         # Concatenate all positive masks, class targets, objectness targets, and bounding box targets
         positive_masks = torch.cat(positive_masks, 0)
         class_targets = torch.cat(class_targets, 0)
@@ -327,7 +324,10 @@ class YOLOXLoss:
 
         # Compute class loss
         loss_cls = self.class_loss_func(flatten_class_preds.view(-1, self.num_classes)[positive_masks],class_targets)
-                
+        
+        # Calculate total number of samples
+        num_total_samples = max(sum(num_positive_images), 1)
+        
         # Scale losses
         loss_bbox = (loss_bbox * self.bbox_loss_weight) / num_total_samples
         loss_obj = (loss_obj * self.objectness_loss_weight) / num_total_samples
