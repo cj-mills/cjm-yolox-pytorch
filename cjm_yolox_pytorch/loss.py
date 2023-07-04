@@ -292,9 +292,9 @@ class YOLOXLoss:
             Dict: A dictionary with the classification, bounding box, objectness, and optionally, L1 loss.
         """
         
-        grid_priors = generate_grid_priors(*[s*self.strides[0] for s in class_scores[0].shape[-2:]], self.strides)
-#         grid_priors[:, :2] *= grid_priors[:, 2].unsqueeze(1)
-        flatten_prior_boxes = torch.cat([grid_priors, grid_priors[:, 2:].clone()], dim=1)
+        multilevel_prior_boxes = generate_grid_priors(*[s*self.strides[0] for s in class_scores[0].shape[-2:]], self.strides)
+        multilevel_prior_boxes[:, :2] *= multilevel_prior_boxes[:, 2].unsqueeze(1)
+        flatten_prior_boxes = torch.cat([multilevel_prior_boxes, multilevel_prior_boxes[:, 2:].clone()], dim=1)
         
         # Flatten and concatenate class predictions, bounding box predictions, and objectness scores
         flatten_class_preds = self.flatten_and_concat(class_scores, num_images, self.num_classes)
