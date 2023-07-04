@@ -154,5 +154,5 @@ checklink/cookies.txt
 
 
 
-# Manual Adds
-# /nbs/pretrained_checkpoints/*
+# Manual Additions
+/nbs/pretrained_checkpoints/*
