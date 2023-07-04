@@ -362,6 +362,7 @@ class YOLOXLoss:
         # Generate multi-level priors
         multilevel_prior_boxes = self.prior_generator.grid_priors(
             feature_map_sizes, with_stride=True)
+        multilevel_prior_boxes = torch.cat(multilevel_prior_boxes)
         print(multilevel_prior_boxes.shape)
         print(multilevel_prior_boxes)
         
