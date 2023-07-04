@@ -19,7 +19,7 @@ import torch.nn as nn
 import torch.nn.init as init
 
 # %% ../nbs/00_model.ipynb 6
-from .utils import download_file, multi_apply
+from .utils import multi_apply
 
 # %% ../nbs/00_model.ipynb 8
 MODEL_TYPES = ['yolox_tiny', 'yolox_s', 'yolox_m', 'yolox_l', 'yolox_x']
@@ -917,6 +917,9 @@ def init_head(head: YOLOXHead, # The YOLOX head to be initialized.
     kaiming_init(head.multi_level_conv_cls)
 
 # %% ../nbs/00_model.ipynb 41
+from cjm_psl_utils.core import download_file
+
+# %% ../nbs/00_model.ipynb 42
 def build_model(model_type:str, # Type of the model to be built.
                 num_classes:int, # Number of classes for the model.
                 pretrained:bool=True, # Whether to load pretrained weights.
@@ -939,7 +942,7 @@ def build_model(model_type:str, # Type of the model to be built.
         if pretrained:
             url = PRETRAINED_URLS[model_type]
             checkpoint_path = os.path.join(checkpoint_dir, Path(url).name)
-            download_file(url, checkpoint_path)
+            download_file(url, checkpoint_dir)
             
             pretrained_ckpt = torch.load(checkpoint_path)['state_dict']
             num_pretrained_classes = pretrained_ckpt['bbox_head.multi_level_conv_cls.0.weight'].shape[0]

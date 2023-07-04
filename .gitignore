@@ -149,3 +149,10 @@ checklink/cookies.txt
 
 # Quarto
 .quarto
+
+
+
+
+
+# Manual Adds
+# /nbs/pretrained_checkpoints/*
