@@ -3,7 +3,7 @@
 # %% auto 0
 __all__ = ['MODEL_TYPES', 'CSP_DARKNET_CFGS', 'PAFPN_CFGS', 'HEAD_CFGS', 'OPENMMLAB_CKPT_URL', 'PRETRAINED_URLS', 'NORM_CFG',
            'ConvModule', 'DarknetBottleneck', 'CSPLayer', 'Focus', 'SPPBottleneck', 'CSPDarknet', 'YOLOXPAFPN',
-           'YOLOXHead', 'YOLOX', 'weights_init', 'init_head', 'build_model']
+           'YOLOXHead', 'YOLOX', 'kaiming_init', 'init_head', 'build_model']
 
 # %% ../nbs/00_model.ipynb 4
 import os
@@ -868,9 +868,19 @@ class YOLOX(nn.Module):
         return x
 
 # %% ../nbs/00_model.ipynb 33
-def weights_init(m):
-    if isinstance(m, nn.Conv2d):
-        init.kaiming_normal_(m.weight.data, mode='fan_out', nonlinearity='relu')
+def kaiming_init(module:torch.nn.Module # The module to be initialized.
+                ) -> None:
+    """
+    Initializes the weights of the Conv2d layers of the given model using the [Kaiming Normal initialization](https://pytorch.org/docs/stable/nn.init.html#torch.nn.init.kaiming_normal_).
+    """
+    
+    # If the module is a 2d convolutional layer
+    if isinstance(module, nn.Conv2d):
+        
+        # Apply Kaiming Normal initialization to the weights of the module
+        # We use 'fan_out' mode as this preserves the magnitude of the variance of the weights
+        # in the forward pass. The nonlinearity is set to 'relu' as the network uses ReLU activation functions.
+        init.kaiming_normal_(module.weight.data, mode='fan_out', nonlinearity='relu')
 
 # %% ../nbs/00_model.ipynb 37
 def init_head(head: YOLOXHead, # The YOLOX head to be initialized.
@@ -895,8 +905,7 @@ def init_head(head: YOLOXHead, # The YOLOX head to be initialized.
     )
     
     # Use Kaiming initialization to initialize the weights of the convolutional layers. 
-    head.multi_level_conv_cls.apply(weights_init)
-#     head.multi_level_conv_cls.apply(weights_init)
+    head.multi_level_conv_cls.apply(kaiming_init)
 
 # %% ../nbs/00_model.ipynb 41
 from cjm_psl_utils.core import download_file
@@ -943,8 +952,7 @@ def build_model(model_type:str, # Type of the model to be built.
             yolox.load_state_dict(pretrained_ckpt)
             init_head(head, num_classes)
         else:
-            yolox.apply(weights_init)
-#             yolox.apply(weights_init)
+            yolox.apply(kaiming_init)
             
     except Exception as e:
         print(f"Error occurred while building the model: {str(e)}")
