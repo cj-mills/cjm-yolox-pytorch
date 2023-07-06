@@ -933,6 +933,8 @@ def build_model(model_type:str, # Type of the model to be built.
         print("The selected model type does not have a pretrained checkpoint. Initializing model with untrained weights.")
         pretrained = False
     
+    yolox = None
+    
     try:
         if pretrained:
             url = PRETRAINED_URLS[model_type]
@@ -956,6 +958,6 @@ def build_model(model_type:str, # Type of the model to be built.
             
     except Exception as e:
         print(f"Error occurred while building the model: {str(e)}")
-        return None
+#         return None
 
     return yolox
