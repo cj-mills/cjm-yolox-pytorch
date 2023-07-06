@@ -938,6 +938,10 @@ def build_model(model_type:str, # Type of the model to be built.
     backbone = CSPDarknet(**backbone_cfg)
     neck = YOLOXPAFPN(**neck_cfg)
 
+    if PRETRAINED_URLS[model_type] != None:
+        print("The selected model type does not have a pretrained checkpoint. Initializing model with untrained weights.")
+        pretrained = False
+    
     try:
         if pretrained:
             url = PRETRAINED_URLS[model_type]
