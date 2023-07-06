@@ -868,28 +868,19 @@ class YOLOX(nn.Module):
         return x
 
 # %% ../nbs/00_model.ipynb 33
-def kaiming_init(model:torch.nn.Module # The model to be initialized.
+def kaiming_init(module:torch.nn.Module # The module to be initialized.
                 ) -> None:
     """
     Initializes the weights of the Conv2d layers of the given model using the [Kaiming Normal initialization](https://pytorch.org/docs/stable/nn.init.html#torch.nn.init.kaiming_normal_).
     """
     
-    # Iterating through each module in the model
-    for module in model.modules():
-
-        # If the module is a 2d convolutional layer
-        if isinstance(module, nn.Conv2d):
-            
-            # Apply Kaiming Normal initialization to the weights of the module
-            # We use 'fan_out' mode as this preserves the magnitude of the variance of the weights
-            # in the forward pass. The nonlinearity is set to 'relu' as the network uses ReLU activation functions.
-            nn.init.kaiming_normal_(module.weight, mode='fan_out', nonlinearity='relu')
-            
-            # If the module has a bias term
-            if module.bias is not None:
-                
-                # Initialize the bias term to 0 for this module
-                nn.init.constant_(module.bias, 0)
+    # If the module is a 2d convolutional layer
+    if isinstance(module, nn.Conv2d):
+        
+        # Apply Kaiming Normal initialization to the weights of the module
+        # We use 'fan_out' mode as this preserves the magnitude of the variance of the weights
+        # in the forward pass. The nonlinearity is set to 'relu' as the network uses ReLU activation functions.
+        init.kaiming_normal_(module.weight.data, mode='fan_out', nonlinearity='relu')
 
 # %% ../nbs/00_model.ipynb 37
 def init_head(head: YOLOXHead, # The YOLOX head to be initialized.
@@ -914,7 +905,7 @@ def init_head(head: YOLOXHead, # The YOLOX head to be initialized.
     )
     
     # Use Kaiming initialization to initialize the weights of the convolutional layers. 
-    kaiming_init(head.multi_level_conv_cls)
+    head.multi_level_conv_cls.apply(kaiming_init)
 
 # %% ../nbs/00_model.ipynb 41
 from cjm_psl_utils.core import download_file
@@ -961,7 +952,7 @@ def build_model(model_type:str, # Type of the model to be built.
             yolox.load_state_dict(pretrained_ckpt)
             init_head(head, num_classes)
         else:
-            kaiming_init(yolox)
+            yolox.apply(kaiming_init)
             
     except Exception as e:
         print(f"Error occurred while building the model: {str(e)}")
