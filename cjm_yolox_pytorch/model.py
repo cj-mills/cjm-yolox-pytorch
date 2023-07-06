@@ -902,9 +902,13 @@ def init_head(head: YOLOXHead, # The YOLOX head to be initialized.
     # Create a list of 2D convolutional layers, one for each stride in the head.
     # Each convolutional layer will have a number of output channels equal to the number of classes
     # and a kernel size of 1 (i.e., it will perform a 1x1 convolution).
-    head.multi_level_conv_cls = nn.ModuleList(
-        [nn.Conv2d(head.feat_channels, head.cls_out_channels, 1) for _ in head.strides]
-    )
+    
+    conv_layers = [nn.Conv2d(head.feat_channels, head.cls_out_channels, 1) for _ in head.strides]
+    
+    for conv in conv_layers:
+        init.kaiming_normal_(conv.weight.data, mode='fan_out', nonlinearity='relu')
+    
+    head.multi_level_conv_cls = nn.ModuleList(conv_layers)
     
     # Use Kaiming initialization to initialize the weights of the convolutional layers. 
     head.multi_level_conv_cls.apply(kaiming_init)
@@ -953,11 +957,9 @@ def build_model(model_type:str, # Type of the model to be built.
         if pretrained:
             yolox.load_state_dict(pretrained_ckpt)
             init_head(head, num_classes)
-#         else:
-#             yolox.apply(kaiming_init)
             
     except Exception as e:
         print(f"Error occurred while building the model: {str(e)}")
-#         return None
+        return None
 
     return yolox
