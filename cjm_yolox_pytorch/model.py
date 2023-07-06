@@ -96,6 +96,8 @@ class ConvModule(nn.Module):
         self.bn = nn.BatchNorm2d(out_channels, eps=eps, momentum=momentum, affine=affine, track_running_stats=track_running_stats)
         # Activation function
         self.activate = activation_function()
+        
+        init.kaiming_normal_(self.conv.weight.data, mode='fan_out', nonlinearity='relu')
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         
@@ -933,8 +935,6 @@ def build_model(model_type:str, # Type of the model to be built.
         print("The selected model type does not have a pretrained checkpoint. Initializing model with untrained weights.")
         pretrained = False
     
-    yolox = None
-    
     try:
         if pretrained:
             url = PRETRAINED_URLS[model_type]
@@ -953,8 +953,8 @@ def build_model(model_type:str, # Type of the model to be built.
         if pretrained:
             yolox.load_state_dict(pretrained_ckpt)
             init_head(head, num_classes)
-        else:
-            yolox.apply(kaiming_init)
+#         else:
+#             yolox.apply(kaiming_init)
             
     except Exception as e:
         print(f"Error occurred while building the model: {str(e)}")
