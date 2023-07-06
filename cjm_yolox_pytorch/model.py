@@ -905,8 +905,8 @@ def init_head(head: YOLOXHead, # The YOLOX head to be initialized.
     )
     
     # Use Kaiming initialization to initialize the weights of the convolutional layers. 
-    head.multi_level_conv_cls.apply(kaiming_init)
-    head.multi_level_conv_cls.apply(kaiming_init)
+#     head.multi_level_conv_cls.apply(kaiming_init)
+#     head.multi_level_conv_cls.apply(kaiming_init)
 
 # %% ../nbs/00_model.ipynb 41
 from cjm_psl_utils.core import download_file
@@ -952,9 +952,9 @@ def build_model(model_type:str, # Type of the model to be built.
         if pretrained:
             yolox.load_state_dict(pretrained_ckpt)
             init_head(head, num_classes)
-        else:
-            yolox.apply(kaiming_init)
-            yolox.apply(kaiming_init)
+#         else:
+#             yolox.apply(kaiming_init)
+#             yolox.apply(kaiming_init)
             
     except Exception as e:
         print(f"Error occurred while building the model: {str(e)}")
