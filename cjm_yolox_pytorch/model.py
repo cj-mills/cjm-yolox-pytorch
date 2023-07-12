@@ -2,8 +2,8 @@
 
 # %% auto 0
 __all__ = ['MODEL_TYPES', 'CSP_DARKNET_CFGS', 'PAFPN_CFGS', 'HEAD_CFGS', 'OPENMMLAB_CKPT_URL', 'PRETRAINED_URLS', 'NORM_CFG',
-           'MODEL_CFGS', 'ConvModule', 'DarknetBottleneck', 'CSPLayer', 'Focus', 'SPPBottleneck', 'CSPDarknet',
-           'YOLOXPAFPN', 'YOLOXHead', 'YOLOX', 'kaiming_init', 'init_head', 'build_model']
+           'NORM_STATS', 'MODEL_CFGS', 'ConvModule', 'DarknetBottleneck', 'CSPLayer', 'Focus', 'SPPBottleneck',
+           'CSPDarknet', 'YOLOXPAFPN', 'YOLOXHead', 'YOLOX', 'kaiming_init', 'init_head', 'build_model']
 
 # %% ../nbs/00_model.ipynb 4
 import os
@@ -59,6 +59,9 @@ PRETRAINED_URLS = {
 }
 
 NORM_CFG = dict(momentum=0.03, eps=0.001)
+
+
+NORM_STATS = dict(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
 
 MODEL_CFGS = {model_type: {**CSP_DARKNET_CFGS[model_type], 
                             **{'neck_'+k: v for k, v in PAFPN_CFGS[model_type].items()}, 
