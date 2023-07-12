@@ -285,7 +285,7 @@ class Focus(nn.Module):
         return self.conv(x)
 
 
-# %% ../nbs/00_model.ipynb 24
+# %% ../nbs/00_model.ipynb 25
 class SPPBottleneck(nn.Module):
     """
     Spatial Pyramid Pooling layer used in YOLOv3-SPP
@@ -293,65 +293,44 @@ class SPPBottleneck(nn.Module):
     Based on OpenMMLab's implementation in the mmdetection library:
     
     - [OpenMMLab's Implementation](https://github.com/open-mmlab/mmdetection/blob/d64e719172335fa3d7a757a2a3636bd19e9efb62/mmdet/models/backbones/csp_darknet.py#L67)
-    
-    #### Pseudocode
-    Function forward(input_tensor x):
-
-    1. Pass x through the first convolutional layer (conv1) and assign the output back to x.
-    2. Create an empty list called pooling_results and add x to it.
-    3. For each pooling layer in the poolings list, do the following:
-       a. Apply the pooling layer on x and append the output to the pooling_results list.
-    4. Concatenate all tensors in the pooling_results list along the channel dimension (dimension 1) and assign the output back to x.
-    5. Pass x through the second convolutional layer (conv2) to combine the features from all pooling layers and project them to the desired number of output channels.
-    6. Return the final output tensor.
-
     """
-
     def __init__(self, 
                  in_channels: int, # The number of input channels.
                  out_channels: int, # The number of output channels.
-                 pool_sizes: List[int]=[5, 9, 13], # The sizes of the pooling areas.
-                 eps: float=0.001, # A value added to the denominator for numerical stability in the BatchNorm layer.
-                 momentum: float=0.03, #  The value used for the running_mean and running_var computation in the BatchNorm layer.
-                 affine: bool=True, # A flag that when set to True, gives the BatchNorm layer learnable affine parameters.
-                 track_running_stats: bool=True # Whether to keep track of running mean and variance in BatchNorm.
-                ):
+                 pool_sizes: List[int] = [5, 9, 13], # The sizes of the pooling areas.
+                 eps: float = 0.001, # A value added to the denominator for numerical stability in the BatchNorm layer.
+                 momentum: float = 0.03, #  The value used for the running_mean and running_var computation in the BatchNorm layer.
+                 affine: bool = True, # A flag that when set to True, gives the BatchNorm layer learnable affine parameters.
+                 track_running_stats: bool = True # Whether to keep track of running mean and variance in BatchNorm.
+                ) -> None:
         
         super(SPPBottleneck, self).__init__()
-        
-        # Reducing the number of channels by a factor of 2
+
         hidden_channels = in_channels // 2
 
-        # Convolution layer to reduce the number of channels
         self.conv1 = ConvModule(in_channels, hidden_channels, kernel_size=1, stride=1, padding=0, 
                                 bias=False, eps=eps, momentum=momentum, affine=affine, 
                                 track_running_stats=track_running_stats)
 
-        # List of pooling layers with different window sizes
-        self.poolings = nn.ModuleList([nn.MaxPool2d(kernel_size=ps, stride=1, padding=ps//2) for ps in pool_sizes])
+        self.pooling_layers = nn.ModuleList([nn.MaxPool2d(kernel_size=ps, stride=1, padding=ps//2) for ps in pool_sizes])
 
-        # Convolution layer to combine the features from the pooling layers and project them to the desired number of output channels
-        self.conv2 = ConvModule(hidden_channels*(len(pool_sizes)+1), out_channels, kernel_size=1, stride=1, padding=0, 
+        self.conv2 = ConvModule(hidden_channels * (len(pool_sizes) + 1), out_channels, kernel_size=1, stride=1, padding=0, 
                                 bias=False, eps=eps, momentum=momentum, affine=affine, 
                                 track_running_stats=track_running_stats)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
                 
-        # Reducing the number of channels by a factor of 2 using the convolution layer
         x = self.conv1(x)
 
-        # Applying max pooling with different window sizes and collecting the results
         pooling_results = [x]
-        for pooling in self.poolings:
+        for pooling in self.pooling_layers:
             pooling_results.append(pooling(x))
 
-        # Concatenating the results of pooling along the channel dimension
         x = torch.cat(pooling_results, dim=1)
 
-        # Combining the features and projecting them to the desired number of output channels using the convolution layer
         return self.conv2(x)
 
-# %% ../nbs/00_model.ipynb 26
+# %% ../nbs/00_model.ipynb 27
 class CSPDarknet(nn.Module):
     """
     CSP-Darknet backbone
@@ -466,7 +445,7 @@ class CSPDarknet(nn.Module):
                 outs.append(x)
         return tuple(outs)
 
-# %% ../nbs/00_model.ipynb 29
+# %% ../nbs/00_model.ipynb 30
 class YOLOXPAFPN(nn.Module):
     """
     Path Aggregation Feature Pyramid Network (PAFPN) used in YOLOX.
@@ -621,7 +600,7 @@ class YOLOXPAFPN(nn.Module):
 
         return tuple(outs)
 
-# %% ../nbs/00_model.ipynb 32
+# %% ../nbs/00_model.ipynb 33
 class YOLOXHead(nn.Module):
     """
     The head of YOLOX model <https://arxiv.org/abs/2107.08430>, used for bounding box prediction.
@@ -784,7 +763,7 @@ class YOLOXHead(nn.Module):
                            self.multi_level_conv_obj)
 
 
-# %% ../nbs/00_model.ipynb 35
+# %% ../nbs/00_model.ipynb 36
 class YOLOX(nn.Module):
     """
     Implementation of `YOLOX: Exceeding YOLO Series in 2021`
@@ -822,7 +801,7 @@ class YOLOX(nn.Module):
 
         return x
 
-# %% ../nbs/00_model.ipynb 38
+# %% ../nbs/00_model.ipynb 39
 def kaiming_init(module:torch.nn.Module # The module to be initialized.
                 ) -> None:
     """
@@ -837,7 +816,7 @@ def kaiming_init(module:torch.nn.Module # The module to be initialized.
         # in the forward pass. The nonlinearity is set to 'relu' as the network uses ReLU activation functions.
         init.kaiming_normal_(module.weight.data, mode='fan_out', nonlinearity='relu')
 
-# %% ../nbs/00_model.ipynb 42
+# %% ../nbs/00_model.ipynb 43
 def init_head(head: YOLOXHead, # The YOLOX head to be initialized.
               num_classes: int # The number of classes in the dataset.
              ) -> None:
@@ -866,10 +845,10 @@ def init_head(head: YOLOXHead, # The YOLOX head to be initialized.
     # Use Kaiming initialization to initialize the weights of the convolutional layers. 
     head.multi_level_conv_cls.apply(kaiming_init)
 
-# %% ../nbs/00_model.ipynb 46
+# %% ../nbs/00_model.ipynb 47
 from cjm_psl_utils.core import download_file
 
-# %% ../nbs/00_model.ipynb 47
+# %% ../nbs/00_model.ipynb 48
 def build_model(model_type:str, # Type of the model to be built.
                 num_classes:int, # Number of classes for the model.
                 pretrained:bool=True, # Whether to load pretrained weights.
