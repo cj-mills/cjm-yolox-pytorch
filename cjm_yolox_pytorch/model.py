@@ -2,8 +2,8 @@
 
 # %% auto 0
 __all__ = ['MODEL_TYPES', 'CSP_DARKNET_CFGS', 'PAFPN_CFGS', 'HEAD_CFGS', 'OPENMMLAB_CKPT_URL', 'PRETRAINED_URLS', 'NORM_CFG',
-           'ConvModule', 'DarknetBottleneck', 'CSPLayer', 'Focus', 'SPPBottleneck', 'CSPDarknet', 'YOLOXPAFPN',
-           'YOLOXHead', 'YOLOX', 'kaiming_init', 'init_head', 'build_model']
+           'MODEL_CFGS', 'ConvModule', 'DarknetBottleneck', 'CSPLayer', 'Focus', 'SPPBottleneck', 'CSPDarknet',
+           'YOLOXPAFPN', 'YOLOXHead', 'YOLOX', 'kaiming_init', 'init_head', 'build_model']
 
 # %% ../nbs/00_model.ipynb 4
 import os
@@ -60,7 +60,13 @@ PRETRAINED_URLS = {
 
 NORM_CFG = dict(momentum=0.03, eps=0.001)
 
-# %% ../nbs/00_model.ipynb 11
+MODEL_CFGS = {model_type: {**CSP_DARKNET_CFGS[model_type], 
+                            **{'neck_'+k: v for k, v in PAFPN_CFGS[model_type].items()}, 
+                            **{'head_'+k: v for k, v in HEAD_CFGS[model_type].items()}, 
+                            **{k:{"pretrained": v != None} for k,v in PRETRAINED_URLS.items()}[model_type]} 
+               for model_type in MODEL_TYPES}
+
+# %% ../nbs/00_model.ipynb 13
 class ConvModule(nn.Module):
     """
     Configurable block used for Convolution2d-Normalization-Activation blocks.
@@ -108,7 +114,7 @@ class ConvModule(nn.Module):
         # Apply activation function and return result
         return self.activate(x)
 
-# %% ../nbs/00_model.ipynb 13
+# %% ../nbs/00_model.ipynb 15
 class DarknetBottleneck(nn.Module):
     """
     Basic Darknet bottleneck block used in Darknet.
@@ -180,7 +186,7 @@ class DarknetBottleneck(nn.Module):
 
         return out
 
-# %% ../nbs/00_model.ipynb 15
+# %% ../nbs/00_model.ipynb 17
 class CSPLayer(nn.Module):
     
     """
@@ -266,7 +272,7 @@ class CSPLayer(nn.Module):
         # Returning the final output
         return out
 
-# %% ../nbs/00_model.ipynb 17
+# %% ../nbs/00_model.ipynb 19
 class Focus(nn.Module):
     
     """
@@ -332,7 +338,7 @@ class Focus(nn.Module):
         )
         return self.conv(x)
 
-# %% ../nbs/00_model.ipynb 19
+# %% ../nbs/00_model.ipynb 21
 class SPPBottleneck(nn.Module):
     """
     Spatial Pyramid Pooling layer used in YOLOv3-SPP
@@ -398,7 +404,7 @@ class SPPBottleneck(nn.Module):
         # Combining the features and projecting them to the desired number of output channels using the convolution layer
         return self.conv2(x)
 
-# %% ../nbs/00_model.ipynb 21
+# %% ../nbs/00_model.ipynb 23
 class CSPDarknet(nn.Module):
     """
     CSP-Darknet backbone
@@ -513,7 +519,7 @@ class CSPDarknet(nn.Module):
                 outs.append(x)
         return tuple(outs)
 
-# %% ../nbs/00_model.ipynb 24
+# %% ../nbs/00_model.ipynb 26
 class YOLOXPAFPN(nn.Module):
     """
     Path Aggregation Feature Pyramid Network (PAFPN) used in YOLOX.
@@ -668,7 +674,7 @@ class YOLOXPAFPN(nn.Module):
 
         return tuple(outs)
 
-# %% ../nbs/00_model.ipynb 27
+# %% ../nbs/00_model.ipynb 29
 class YOLOXHead(nn.Module):
     """
     The head of YOLOX model <https://arxiv.org/abs/2107.08430>, used for bounding box prediction.
@@ -831,7 +837,7 @@ class YOLOXHead(nn.Module):
                            self.multi_level_conv_obj)
 
 
-# %% ../nbs/00_model.ipynb 30
+# %% ../nbs/00_model.ipynb 32
 class YOLOX(nn.Module):
     """
     Implementation of `YOLOX: Exceeding YOLO Series in 2021`
@@ -869,7 +875,7 @@ class YOLOX(nn.Module):
 
         return x
 
-# %% ../nbs/00_model.ipynb 33
+# %% ../nbs/00_model.ipynb 35
 def kaiming_init(module:torch.nn.Module # The module to be initialized.
                 ) -> None:
     """
@@ -884,7 +890,7 @@ def kaiming_init(module:torch.nn.Module # The module to be initialized.
         # in the forward pass. The nonlinearity is set to 'relu' as the network uses ReLU activation functions.
         init.kaiming_normal_(module.weight.data, mode='fan_out', nonlinearity='relu')
 
-# %% ../nbs/00_model.ipynb 37
+# %% ../nbs/00_model.ipynb 39
 def init_head(head: YOLOXHead, # The YOLOX head to be initialized.
               num_classes: int # The number of classes in the dataset.
              ) -> None:
@@ -913,10 +919,10 @@ def init_head(head: YOLOXHead, # The YOLOX head to be initialized.
     # Use Kaiming initialization to initialize the weights of the convolutional layers. 
     head.multi_level_conv_cls.apply(kaiming_init)
 
-# %% ../nbs/00_model.ipynb 41
+# %% ../nbs/00_model.ipynb 43
 from cjm_psl_utils.core import download_file
 
-# %% ../nbs/00_model.ipynb 42
+# %% ../nbs/00_model.ipynb 44
 def build_model(model_type:str, # Type of the model to be built.
                 num_classes:int, # Number of classes for the model.
                 pretrained:bool=True, # Whether to load pretrained weights.
