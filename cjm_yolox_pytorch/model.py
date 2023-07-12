@@ -117,26 +117,17 @@ class ConvModule(nn.Module):
         # Apply activation function and return result
         return self.activate(x)
 
-# %% ../nbs/00_model.ipynb 15
+# %% ../nbs/00_model.ipynb 16
 class DarknetBottleneck(nn.Module):
     """
     Basic Darknet bottleneck block used in Darknet.
     
+    This class represents a basic bottleneck block used in Darknet, which 
+    consists of two convolutional layers with a possible identity shortcut.
+    
     Based on OpenMMLab's implementation in the mmdetection library:
     
-    - [OpenMMLab's Implementation](https://github.com/open-mmlab/mmdetection/blob/d64e719172335fa3d7a757a2a3636bd19e9efb62/mmdet/models/utils/csp_layer.py#L8)
-    
-    #### Pseudocode
-    Function forward(input_tensor x):
-    
-    1. Store x as identity.
-    2. Pass x through the first convolutional layer (conv1), and then the result through the second convolutional layer (conv2). Store the output as 'out'.
-    3. Check if add_identity is True:
-       a. If True, check if identity_conv exists (i.e., when the input and output channels do not match).
-          i. If identity_conv exists, pass identity through the identity_conv layer and update the identity.
-       b. Add the updated identity to the 'out'.
-    4. Return 'out' as the final output.
-
+     - [OpenMMLab's Implementation](https://github.com/open-mmlab/mmdetection/blob/d64e719172335fa3d7a757a2a3636bd19e9efb62/mmdet/models/utils/csp_layer.py#L8)
     """
     
     def __init__(self, 
@@ -147,49 +138,41 @@ class DarknetBottleneck(nn.Module):
                  affine: bool = True, # A flag that when set to True, gives the ConvModule's BatchNorm layer learnable affine parameters.
                  track_running_stats: bool = True, # If True, the ConvModule's BatchNorm layer will track the running mean and variance.
                  add_identity: bool = True # If True, add an identity shortcut (also known as skip connection) to the output.
-                ):
+                ) -> None:
         super(DarknetBottleneck, self).__init__()
 
         self.add_identity = add_identity
-        self.in_channels = in_channels
-        self.out_channels = out_channels
-        
-        # First convolutional layer with 1x1 kernel size
+
+        # The first conv layer reduces the dimensionality with a 1x1 kernel, 
+        # and the second conv layer restores it with a 3x3 kernel.
         self.conv1 = ConvModule(in_channels, out_channels, kernel_size=1, stride=1, padding=0, 
                                 bias=False, eps=eps, momentum=momentum, affine=affine, 
                                 track_running_stats=track_running_stats)
-        
-        # Second convolutional layer with 3x3 kernel size
         self.conv2 = ConvModule(out_channels, out_channels, kernel_size=3, stride=1, padding=1, 
                                 bias=False, eps=eps, momentum=momentum, affine=affine, 
                                 track_running_stats=track_running_stats)
         
-        # Add a 1x1 conv on shortcut when in and out channels don't match
-        if self.add_identity and self.in_channels != self.out_channels:
+        # If add_identity is True and in_channels do not match out_channels, 
+        # introduce a conv layer on the identity shortcut to match the dimensions.
+        # If not, use nn.Identity() for a cleaner forward method.
+        if self.add_identity and in_channels != out_channels:
             self.identity_conv = ConvModule(in_channels, out_channels, kernel_size=1, stride=1, padding=0, 
                                             bias=False, eps=eps, momentum=momentum, affine=affine, 
                                             track_running_stats=track_running_stats)
         else:
-            self.identity_conv = None
+            self.identity_conv = nn.Identity()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-                
-        # Store the input tensor as identity tensor for possible use in shortcut connection
         identity = x
-        # Pass the input tensor through two conv layers in sequence
         out = self.conv2(self.conv1(x))
         
-        # If add_identity is True, then add the original input (identity) to the output of the conv layers
+        # If add_identity is True, add the transformed (if necessary) identity to the output
         if self.add_identity:
-            # Apply a conv layer to the identity tensor if the in and out channels don't match
-            if self.identity_conv is not None:
-                identity = self.identity_conv(identity)
-            # Add the identity tensor to the output tensor
-            out += identity
+            out += self.identity_conv(identity)
 
         return out
 
-# %% ../nbs/00_model.ipynb 18
+# %% ../nbs/00_model.ipynb 19
 class CSPLayer(nn.Module):
     """
     Cross Stage Partial Layer (CSPLayer).
@@ -246,7 +229,7 @@ class CSPLayer(nn.Module):
 
         return self.final_conv(torch.cat((main_path, shortcut_path), dim=1))
 
-# %% ../nbs/00_model.ipynb 21
+# %% ../nbs/00_model.ipynb 22
 class Focus(nn.Module):
     """
     Focus width and height information into channel space.
@@ -302,7 +285,7 @@ class Focus(nn.Module):
         return self.conv(x)
 
 
-# %% ../nbs/00_model.ipynb 23
+# %% ../nbs/00_model.ipynb 24
 class SPPBottleneck(nn.Module):
     """
     Spatial Pyramid Pooling layer used in YOLOv3-SPP
@@ -368,7 +351,7 @@ class SPPBottleneck(nn.Module):
         # Combining the features and projecting them to the desired number of output channels using the convolution layer
         return self.conv2(x)
 
-# %% ../nbs/00_model.ipynb 25
+# %% ../nbs/00_model.ipynb 26
 class CSPDarknet(nn.Module):
     """
     CSP-Darknet backbone
@@ -483,7 +466,7 @@ class CSPDarknet(nn.Module):
                 outs.append(x)
         return tuple(outs)
 
-# %% ../nbs/00_model.ipynb 28
+# %% ../nbs/00_model.ipynb 29
 class YOLOXPAFPN(nn.Module):
     """
     Path Aggregation Feature Pyramid Network (PAFPN) used in YOLOX.
@@ -638,7 +621,7 @@ class YOLOXPAFPN(nn.Module):
 
         return tuple(outs)
 
-# %% ../nbs/00_model.ipynb 31
+# %% ../nbs/00_model.ipynb 32
 class YOLOXHead(nn.Module):
     """
     The head of YOLOX model <https://arxiv.org/abs/2107.08430>, used for bounding box prediction.
@@ -801,7 +784,7 @@ class YOLOXHead(nn.Module):
                            self.multi_level_conv_obj)
 
 
-# %% ../nbs/00_model.ipynb 34
+# %% ../nbs/00_model.ipynb 35
 class YOLOX(nn.Module):
     """
     Implementation of `YOLOX: Exceeding YOLO Series in 2021`
@@ -839,7 +822,7 @@ class YOLOX(nn.Module):
 
         return x
 
-# %% ../nbs/00_model.ipynb 37
+# %% ../nbs/00_model.ipynb 38
 def kaiming_init(module:torch.nn.Module # The module to be initialized.
                 ) -> None:
     """
@@ -854,7 +837,7 @@ def kaiming_init(module:torch.nn.Module # The module to be initialized.
         # in the forward pass. The nonlinearity is set to 'relu' as the network uses ReLU activation functions.
         init.kaiming_normal_(module.weight.data, mode='fan_out', nonlinearity='relu')
 
-# %% ../nbs/00_model.ipynb 41
+# %% ../nbs/00_model.ipynb 42
 def init_head(head: YOLOXHead, # The YOLOX head to be initialized.
               num_classes: int # The number of classes in the dataset.
              ) -> None:
@@ -883,10 +866,10 @@ def init_head(head: YOLOXHead, # The YOLOX head to be initialized.
     # Use Kaiming initialization to initialize the weights of the convolutional layers. 
     head.multi_level_conv_cls.apply(kaiming_init)
 
-# %% ../nbs/00_model.ipynb 45
+# %% ../nbs/00_model.ipynb 46
 from cjm_psl_utils.core import download_file
 
-# %% ../nbs/00_model.ipynb 46
+# %% ../nbs/00_model.ipynb 47
 def build_model(model_type:str, # Type of the model to be built.
                 num_classes:int, # Number of classes for the model.
                 pretrained:bool=True, # Whether to load pretrained weights.
