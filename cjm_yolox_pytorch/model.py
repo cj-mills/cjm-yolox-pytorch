@@ -189,111 +189,71 @@ class DarknetBottleneck(nn.Module):
 
         return out
 
-# %% ../nbs/00_model.ipynb 17
+# %% ../nbs/00_model.ipynb 18
 class CSPLayer(nn.Module):
-    
     """
-    Cross Stage Partial Layer
+    Cross Stage Partial Layer (CSPLayer).
+    
+    This layer consists of a series of convolutions, blocks of transformations, and a final convolution. 
+    The inputs are processed via two paths: a main path with blocks and a shortcut path. The results from 
+    both paths are concatenated and further processed before returning the final output.
+
+    The blocks are instances of the DarknetBottleneck class which perform additional transformations.
     
     Based on OpenMMLab's implementation in the mmdetection library:
     
-    - [OpenMMLab's Implementation](https://github.com/open-mmlab/mmdetection/blob/d64e719172335fa3d7a757a2a3636bd19e9efb62/mmdet/models/utils/csp_layer.py#L75)
-    
-    #### Pseudocode
-    1. Start with input `x`
-    2. Apply `main_conv` layer on `x` and store the output in `x1`
-    3. Apply `short_conv` layer on `x` and store the output in `x2`
-    4. For each `block` in the `blocks` list:
-        - Pass `x1` through the `block` and store the result back in `x1`
-    5. Concatenate `x1` and `x2` along dimension 1 to form a new tensor called `out`
-    6. Pass `out` through the `final_conv` layer and store the result back in `out`
-    7. Return `out` as the final output of the forward function
-    
-    Notes:
-    
-    - The `main_conv`, `short_conv`, and `final_conv` are convolution layers which apply a series of transformations (including convolution, batch normalization, and non-linear activation) on the input tensor.
-    - The `blocks` list contains a number of "bottleneck" layers that perform additional transformations on the `x1` tensor. Each bottleneck layer has a specific structure, with two convolution layers and an optional identity shortcut.
-    - The concatenation operation combines the results of the `main_conv` layers processed through `blocks` and the `short_conv` layer, preparing the tensor for the final transformations in `final_conv`.
+    - [OpenMMLab's Implementation](https://github.com/open-mmlab/mmdetection/blob/d64e719172335fa3d7a757a2a3636bd19e9efb62/mmdet/models/)
     """
-        
     def __init__(self, 
-                 in_channels, # Number of input channels.
-                 out_channels, # Number of output channels.
-                 num_blocks, # Number of blocks in the bottleneck.
-                 kernel_size=1, # Size of the convolving kernel.
-                 stride=1, # Stride of the convolution.
-                 padding=0, # Zero-padding added to both sides of the input.
-                 eps=0.001, # A value added to the denominator for numerical stability in the ConvModule's BatchNorm layer.
-                 momentum=0.03, # The value used for the running_mean and running_var computation in the ConvModule's BatchNorm layer.
-                 affine=True, # A flag that when set to True, gives the ConvModule's BatchNorm layer learnable affine parameters.
-                 track_running_stats=True, # Whether or not to track the running mean and variance during training.
-                 add_identity=True # Whether or not to add an identity shortcut connection if the input and output are the same size.
-                ):
+                 in_channels: int, # Number of input channels.
+                 out_channels: int, # Number of output channels.
+                 num_blocks: int, # Number of blocks in the bottleneck.
+                 kernel_size: int = 1, # Size of the convolving kernel.
+                 stride: int = 1, # Stride of the convolution.
+                 padding: int = 0, # Zero-padding added to both sides of the input.
+                 eps: float = 0.001, # A value added to the denominator for numerical stability.
+                 momentum: float = 0.03, # The value used for the running_mean and running_var computation.
+                 affine: bool = True, # A flag that when set to True, gives the layer learnable affine parameters.
+                 track_running_stats: bool = True, # Whether or not to track the running mean and variance during training.
+                 add_identity: bool = True # Whether or not to add an identity shortcut connection if the input and output are the same size.
+                ) -> None:
         
-        super(CSPLayer, self).__init__()
+        super().__init__()
 
-        # Define the number of hidden_channels as half the number of out_channels
         hidden_channels = out_channels // 2
 
-        # Define the main convolution layer
         self.main_conv = ConvModule(in_channels, hidden_channels, kernel_size, stride, padding, 
                                     bias=False, eps=eps, momentum=momentum, affine=affine, 
                                     track_running_stats=track_running_stats)
 
-        # Define the short convolution layer
         self.short_conv = ConvModule(in_channels, hidden_channels, kernel_size, stride, padding, 
                                      bias=False, eps=eps, momentum=momentum, affine=affine, 
                                      track_running_stats=track_running_stats)
 
-        # Define the final convolution layer, which takes in the concatenated output from main_conv 
-        # and short_conv and outputs to the final output layer
         self.final_conv = ConvModule(2 * hidden_channels, out_channels, kernel_size, stride, padding, 
                                      bias=False, eps=eps, momentum=momentum, affine=affine, 
                                      track_running_stats=track_running_stats)
         
-        # Define a list of blocks using the DarknetBottleneck structure
         self.blocks = nn.ModuleList([DarknetBottleneck(hidden_channels, hidden_channels, eps, momentum, affine, track_running_stats, add_identity) for _ in range(num_blocks)])
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         
-        # Pass the input through the main_conv layer
-        x1 = self.main_conv(x)
-
-        # Pass the input through the short_conv layer
-        x2 = self.short_conv(x)
-
-        # Pass the output of main_conv through each block in the blocks list
+        main_path = self.main_conv(x)
         for block in self.blocks:
-            x1 = block(x1)
+            main_path = block(main_path)
 
-        # Concatenate the outputs of the blocks and the short_conv along dimension 1
-        out = torch.cat((x1, x2), dim=1)
+        shortcut_path = self.short_conv(x)
 
-        # Pass the concatenated output through the final_conv layer
-        out = self.final_conv(out)
+        return self.final_conv(torch.cat((main_path, shortcut_path), dim=1))
 
-        # Returning the final output
-        return out
-
-# %% ../nbs/00_model.ipynb 19
+# %% ../nbs/00_model.ipynb 21
 class Focus(nn.Module):
-    
     """
     Focus width and height information into channel space.
     
     Based on OpenMMLab's implementation in the mmdetection library:
     
     - [OpenMMLab's Implementation](https://github.com/open-mmlab/mmdetection/blob/d64e719172335fa3d7a757a2a3636bd19e9efb62/mmdet/models/backbones/csp_darknet.py#L14)
-    
-    
-    #### Pseudocode
-    Function forward(input_tensor x):
-
-    1. Split the input tensor x into four patches (patch_top_left, patch_top_right, patch_bot_left, patch_bot_right) based on their spatial positions in the last two dimensions of x.
-    2. Concatenate these four patches along the channel dimension and store the output back into 'x'.
-    3. Pass 'x' through the convolutional layer (self.conv) and store the result as 'out'.
-    4. Return 'out' as the final output.
-
     """
     
     def __init__(self,
@@ -329,19 +289,20 @@ class Focus(nn.Module):
         patch_bot_left = x[..., 1::2, ::2]  # Bottom left patch
         patch_bot_right = x[..., 1::2, 1::2]  # Bottom right patch
         
-        # Concatenate the patches along the channel dimension
+        # Concatenate the patches along the channel dimension in order respecting the spatial locality
         x = torch.cat(
             (
                 patch_top_left,
-                patch_bot_left,
                 patch_top_right,
+                patch_bot_left,
                 patch_bot_right,
             ),
             dim=1,
         )
         return self.conv(x)
 
-# %% ../nbs/00_model.ipynb 21
+
+# %% ../nbs/00_model.ipynb 23
 class SPPBottleneck(nn.Module):
     """
     Spatial Pyramid Pooling layer used in YOLOv3-SPP
@@ -407,7 +368,7 @@ class SPPBottleneck(nn.Module):
         # Combining the features and projecting them to the desired number of output channels using the convolution layer
         return self.conv2(x)
 
-# %% ../nbs/00_model.ipynb 23
+# %% ../nbs/00_model.ipynb 25
 class CSPDarknet(nn.Module):
     """
     CSP-Darknet backbone
@@ -522,7 +483,7 @@ class CSPDarknet(nn.Module):
                 outs.append(x)
         return tuple(outs)
 
-# %% ../nbs/00_model.ipynb 26
+# %% ../nbs/00_model.ipynb 28
 class YOLOXPAFPN(nn.Module):
     """
     Path Aggregation Feature Pyramid Network (PAFPN) used in YOLOX.
@@ -677,7 +638,7 @@ class YOLOXPAFPN(nn.Module):
 
         return tuple(outs)
 
-# %% ../nbs/00_model.ipynb 29
+# %% ../nbs/00_model.ipynb 31
 class YOLOXHead(nn.Module):
     """
     The head of YOLOX model <https://arxiv.org/abs/2107.08430>, used for bounding box prediction.
@@ -840,7 +801,7 @@ class YOLOXHead(nn.Module):
                            self.multi_level_conv_obj)
 
 
-# %% ../nbs/00_model.ipynb 32
+# %% ../nbs/00_model.ipynb 34
 class YOLOX(nn.Module):
     """
     Implementation of `YOLOX: Exceeding YOLO Series in 2021`
@@ -878,7 +839,7 @@ class YOLOX(nn.Module):
 
         return x
 
-# %% ../nbs/00_model.ipynb 35
+# %% ../nbs/00_model.ipynb 37
 def kaiming_init(module:torch.nn.Module # The module to be initialized.
                 ) -> None:
     """
@@ -893,7 +854,7 @@ def kaiming_init(module:torch.nn.Module # The module to be initialized.
         # in the forward pass. The nonlinearity is set to 'relu' as the network uses ReLU activation functions.
         init.kaiming_normal_(module.weight.data, mode='fan_out', nonlinearity='relu')
 
-# %% ../nbs/00_model.ipynb 39
+# %% ../nbs/00_model.ipynb 41
 def init_head(head: YOLOXHead, # The YOLOX head to be initialized.
               num_classes: int # The number of classes in the dataset.
              ) -> None:
@@ -922,10 +883,10 @@ def init_head(head: YOLOXHead, # The YOLOX head to be initialized.
     # Use Kaiming initialization to initialize the weights of the convolutional layers. 
     head.multi_level_conv_cls.apply(kaiming_init)
 
-# %% ../nbs/00_model.ipynb 43
+# %% ../nbs/00_model.ipynb 45
 from cjm_psl_utils.core import download_file
 
-# %% ../nbs/00_model.ipynb 44
+# %% ../nbs/00_model.ipynb 46
 def build_model(model_type:str, # Type of the model to be built.
                 num_classes:int, # Number of classes for the model.
                 pretrained:bool=True, # Whether to load pretrained weights.
