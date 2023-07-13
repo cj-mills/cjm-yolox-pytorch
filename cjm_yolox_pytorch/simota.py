@@ -13,7 +13,7 @@ import torch
 import torch.nn.functional as F
 import torchvision
 
-# %% ../nbs/03_simota.ipynb 8
+# %% ../nbs/03_simota.ipynb 7
 @dataclass
 class AssignResult:
     """
@@ -29,7 +29,7 @@ class AssignResult:
     max_iou_values: torch.FloatTensor # The Intersection over Union (IoU) between the predicted bounding box and its assigned actual truth box.
     category_labels: torch.LongTensor = field(default=None) # If specified, for each predicted bounding box, this indicates the category label of the assigned actual truth box.
 
-# %% ../nbs/03_simota.ipynb 10
+# %% ../nbs/03_simota.ipynb 9
 class SimOTAAssigner():
     """
     Computes matching between predictions and ground truth.
@@ -216,27 +216,63 @@ class SimOTAAssigner():
 
         return is_in_gts_or_centers, is_in_boxes_and_centers
     
+#     def dynamic_k_matching(self, cost, pairwise_ious, num_gt, valid_mask):
+#         """
+#         This method performs dynamic k-matching. This is a core part of the SimOTA assignment
+#         where each ground truth object dynamically chooses k bounding box predictions that best 
+#         match itself according to the cost matrix. Then, if there are any conflicts (i.e., one 
+#         prediction is selected by multiple ground truths), the conflicts are resolved by choosing 
+#         the pair with the smallest cost.
+
+#         Args:
+#             cost (Tensor): A 2D tensor representing the cost matrix calculated from both 
+#                 classification cost and regression IoU cost. Shape is [num_priors, num_gts].
+#             pairwise_ious (Tensor): A 2D tensor representing IoU scores between predictions and 
+#                 ground truths. Shape is [num_priors, num_gts].
+#             num_gt (int): The number of ground truth boxes.
+#             valid_mask (Tensor): A 1D tensor representing which predicted boxes are valid based 
+#                 on being in gt bboxes and in centers. Shape is [num_priors].
+
+#         Returns:
+#             matched_pred_ious (Tensor): IoU scores for matched pairs. Shape is [num_priors].
+#             matched_gt_inds (Tensor): The indices of the ground truth for each prior. Shape is [num_priors].
+#         """
+#         # Initialize the matching matrix with zeros
+#         matching_matrix = torch.zeros_like(cost)
+
+#         # Select the top k IoUs for dynamic-k calculation
+#         topk_ious, _ = torch.topk(pairwise_ious, self.candidate_topk, dim=0)
+
+#         # Calculate dynamic k for each ground truth
+#         dynamic_ks = topk_ious.sum(0).int().clamp(min=1)
+
+#         # For each ground truth, find top k matching priors based on smallest cost
+#         _, pos_idx = cost.topk(k=dynamic_ks.max().item(), dim=0, largest=False)
+#         for gt_idx in range(num_gt):
+#             matching_matrix[pos_idx[:dynamic_ks[gt_idx], gt_idx], gt_idx] = 1
+
+#         # If a prior matches multiple ground truths, keep only the one with smallest cost
+#         prior_match_gt_mask = matching_matrix.sum(1) > 1
+#         if prior_match_gt_mask.any():
+#             _, cost_argmin = cost[prior_match_gt_mask].min(dim=1)
+#             matching_matrix[prior_match_gt_mask] *= 0
+#             matching_matrix[prior_match_gt_mask, cost_argmin] = 1
+
+#         # Update the valid mask based on final matches
+#         valid_mask[valid_mask.clone()] = matching_matrix.sum(1) > 0
+
+#         # Get the final matched ground truth indices and IoUs for valid predicted boxes
+#         fg_mask_inboxes = matching_matrix.sum(1) > 0
+#         matched_gt_inds = matching_matrix[fg_mask_inboxes].argmax(1)
+#         matched_pred_ious = (matching_matrix * pairwise_ious).sum(1)[fg_mask_inboxes]
+
+#         return matched_pred_ious, matched_gt_inds
+    
     def dynamic_k_matching(self, cost, pairwise_ious, num_gt, valid_mask):
         """
-        This method performs dynamic k-matching. This is a core part of the SimOTA assignment
-        where each ground truth object dynamically chooses k bounding box predictions that best 
-        match itself according to the cost matrix. Then, if there are any conflicts (i.e., one 
-        prediction is selected by multiple ground truths), the conflicts are resolved by choosing 
-        the pair with the smallest cost.
-
-        Args:
-            cost (Tensor): A 2D tensor representing the cost matrix calculated from both 
-                classification cost and regression IoU cost. Shape is [num_priors, num_gts].
-            pairwise_ious (Tensor): A 2D tensor representing IoU scores between predictions and 
-                ground truths. Shape is [num_priors, num_gts].
-            num_gt (int): The number of ground truth boxes.
-            valid_mask (Tensor): A 1D tensor representing which predicted boxes are valid based 
-                on being in gt bboxes and in centers. Shape is [num_priors].
-
-        Returns:
-            matched_pred_ious (Tensor): IoU scores for matched pairs. Shape is [num_priors].
-            matched_gt_inds (Tensor): The indices of the ground truth for each prior. Shape is [num_priors].
+        ... [the docstring remains the same] ...
         """
+
         # Initialize the matching matrix with zeros
         matching_matrix = torch.zeros_like(cost)
 
@@ -255,7 +291,7 @@ class SimOTAAssigner():
         prior_match_gt_mask = matching_matrix.sum(1) > 1
         if prior_match_gt_mask.any():
             _, cost_argmin = cost[prior_match_gt_mask].min(dim=1)
-            matching_matrix[prior_match_gt_mask] *= 0
+            matching_matrix[prior_match_gt_mask].zero_()
             matching_matrix[prior_match_gt_mask, cost_argmin] = 1
 
         # Update the valid mask based on final matches
