@@ -264,16 +264,12 @@ class SimOTAAssigner():
         # Check if priors are in both ground truth boxes and centers
         is_in_boxes_and_centers = is_in_gts[is_in_gts_or_centers, :] & is_in_cts[is_in_gts_or_centers, :]
         
-        print("Shape of is_in_gts_or_centers: ", is_in_gts_or_centers.shape)
-        print("Shape of is_in_boxes_and_centers: ", is_in_boxes_and_centers.shape)
+#         print("Shape of is_in_gts_or_centers: ", is_in_gts_or_centers.shape)
+#         print("Shape of is_in_boxes_and_centers: ", is_in_boxes_and_centers.shape)
 
         return is_in_gts_or_centers, is_in_boxes_and_centers
 
 
-
-
-
-    
     def dynamic_k_matching(self, cost, pairwise_ious, num_gt, valid_mask):
         """
         This method performs dynamic k-matching. This is a core part of the SimOTA assignment
