@@ -282,7 +282,7 @@ class YOLOXLoss:
         batch_size = class_scores[0].shape[0]
         
         # Generate box coordinates for all grid priors.
-        output_grid_boxes = generate_output_grid_boxes(*[s*self.strides[0] for s in class_scores[0].shape[-2:]], self.strides)
+        output_grid_boxes = generate_output_grids(*[s*self.strides[0] for s in class_scores[0].shape[-2:]], self.strides)
         output_grid_boxes[:, :2] *= output_grid_boxes[:, 2].unsqueeze(1)
         flatten_output_grid_boxes = torch.cat([output_grid_boxes, output_grid_boxes[:, 2:].clone()], dim=1)
         
