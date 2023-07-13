@@ -117,7 +117,7 @@ class ConvModule(nn.Module):
         # Apply activation function and return result
         return self.activate(x)
 
-# %% ../nbs/00_model.ipynb 14
+# %% ../nbs/00_model.ipynb 13
 class DarknetBottleneck(nn.Module):
     """
     Basic Darknet bottleneck block used in Darknet.
@@ -171,7 +171,7 @@ class DarknetBottleneck(nn.Module):
 
         return out
 
-# %% ../nbs/00_model.ipynb 17
+# %% ../nbs/00_model.ipynb 15
 class CSPLayer(nn.Module):
     """
     Cross Stage Partial Layer (CSPLayer).
@@ -228,7 +228,7 @@ class CSPLayer(nn.Module):
 
         return self.final_conv(torch.cat((main_path, shortcut_path), dim=1))
 
-# %% ../nbs/00_model.ipynb 20
+# %% ../nbs/00_model.ipynb 17
 class Focus(nn.Module):
     """
     Focus width and height information into channel space.
@@ -284,7 +284,7 @@ class Focus(nn.Module):
         return self.conv(x)
 
 
-# %% ../nbs/00_model.ipynb 23
+# %% ../nbs/00_model.ipynb 19
 class SPPBottleneck(nn.Module):
     """
     Spatial Pyramid Pooling layer used in YOLOv3-SPP
@@ -329,7 +329,7 @@ class SPPBottleneck(nn.Module):
 
         return self.conv2(x)
 
-# %% ../nbs/00_model.ipynb 25
+# %% ../nbs/00_model.ipynb 21
 class CSPDarknet(nn.Module):
     """
     The `CSPDarknet` class implements a CSPDarknet backbone, a convolutional neural network (CNN) used in various image recognition tasks. The CSPDarknet backbone forms an integral part of the YOLOX object detection model.
@@ -432,7 +432,7 @@ class CSPDarknet(nn.Module):
                 outs.append(x)
         return tuple(outs)
 
-# %% ../nbs/00_model.ipynb 29
+# %% ../nbs/00_model.ipynb 24
 class YOLOXPAFPN(nn.Module):
     """
     Path Aggregation Feature Pyramid Network (PAFPN) used in YOLOX.
@@ -552,7 +552,7 @@ class YOLOXPAFPN(nn.Module):
             outs.append(out)
         return outs
 
-# %% ../nbs/00_model.ipynb 33
+# %% ../nbs/00_model.ipynb 27
 class YOLOXHead(nn.Module):
     """
     The `YOLOXHead` class is a PyTorch module that implements the head of a YOLOX model <https://arxiv.org/abs/2107.08430>, used for bounding box prediction.
@@ -675,7 +675,7 @@ class YOLOXHead(nn.Module):
                            self.multi_level_conv_obj)
 
 
-# %% ../nbs/00_model.ipynb 36
+# %% ../nbs/00_model.ipynb 30
 class YOLOX(nn.Module):
     """
     Implementation of `YOLOX: Exceeding YOLO Series in 2021`
@@ -713,7 +713,7 @@ class YOLOX(nn.Module):
 
         return x
 
-# %% ../nbs/00_model.ipynb 39
+# %% ../nbs/00_model.ipynb 33
 def init_head(head: YOLOXHead, # The YOLOX head to be initialized.
               num_classes: int # The number of classes in the dataset.
              ) -> None:
@@ -740,10 +740,10 @@ def init_head(head: YOLOXHead, # The YOLOX head to be initialized.
     
     head.multi_level_conv_cls = nn.ModuleList(conv_layers)
 
-# %% ../nbs/00_model.ipynb 43
+# %% ../nbs/00_model.ipynb 37
 from cjm_psl_utils.core import download_file
 
-# %% ../nbs/00_model.ipynb 44
+# %% ../nbs/00_model.ipynb 38
 def build_model(model_type:str, # Type of the model to be built.
                 num_classes:int, # Number of classes for the model.
                 pretrained:bool=True, # Whether to load pretrained weights.
