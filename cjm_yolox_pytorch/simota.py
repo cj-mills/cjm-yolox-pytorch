@@ -242,7 +242,7 @@ class SimOTAAssigner():
 
         # Check if priors are inside the ground truth boxes
         is_in_gts = gt_bounds.min(dim=-1).values > 0
-        is_in_gts_all = is_in_gts.any(dim=2)
+        is_in_gts_all = is_in_gts.any(dim=1)
 
         # Prepare the boundaries for the center boxes
         ct_bounds = torch.stack([
@@ -252,7 +252,7 @@ class SimOTAAssigner():
 
         # Check if priors are inside the center boxes
         is_in_cts = ct_bounds.min(dim=-1).values > 0
-        is_in_cts_all = is_in_cts.any(dim=2)
+        is_in_cts_all = is_in_cts.any(dim=1)
 
         # Check if priors are in either any ground truth box or any center box
         is_in_gts_or_centers = is_in_gts_all | is_in_cts_all
@@ -264,6 +264,7 @@ class SimOTAAssigner():
         print("Shape of is_in_boxes_and_centers: ", is_in_boxes_and_centers.shape)
 
         return is_in_gts_or_centers, is_in_boxes_and_centers
+
 
     
     def dynamic_k_matching(self, cost, pairwise_ious, num_gt, valid_mask):
