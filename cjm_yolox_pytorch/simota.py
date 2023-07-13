@@ -231,35 +231,44 @@ class SimOTAAssigner():
         """
 
         # Calculate the centers of the ground truth boxes
-        gt_centers = (gt_bboxes[:, [0,1]] + gt_bboxes[:, [2,3]]) / 2.0
+        gt_centers = (gt_bboxes[:, 0] + gt_bboxes[:, 2]) / 2.0
+        gt_cys = (gt_bboxes[:, 1] + gt_bboxes[:, 3]) / 2.0
 
-        # Prepare the boundaries for the ground truth boxes and center boxes
-        gt_bounds = torch.stack([priors[:, None, :2] - gt_bboxes[:, :, :2], gt_bboxes[:, :, 2:] - priors[:, None, :2]], dim=-1)
-        ct_bounds = torch.stack([priors[:, None, :2] - (gt_centers[:, :, None] - self.center_radius * priors[:, 2:3, None]), 
-                                 (gt_centers[:, :, None] + self.center_radius * priors[:, 2:3, None]) - priors[:, None, :2]], dim=-1)
+        # Calculate the boundaries for the ground truth boxes
+        gt_bounds = torch.stack([
+            priors[:, 0, None] - gt_bboxes[:, 0], 
+            priors[:, 1, None] - gt_bboxes[:, 1], 
+            gt_bboxes[:, 2] - priors[:, 0, None], 
+            gt_bboxes[:, 3] - priors[:, 1, None]
+        ], dim=1)
 
-        # Check if priors are inside the ground truth boxes and center boxes
-        is_in_gts = gt_bounds.min(dim=-1).values > 0
-        is_in_cts = ct_bounds.min(dim=-1).values > 0
-        
-        print("Shape of is_in_gts: ", is_in_gts.shape)
-        print("Shape of is_in_cts: ", is_in_cts.shape)
-
-        # Check if a prior is in any ground truth box and any center box
+        # Check if priors are inside the ground truth boxes
+        is_in_gts = gt_bounds.min(dim=1).values > 0
         is_in_gts_all = is_in_gts.any(dim=1)
+
+        # Prepare the boundaries for the center boxes
+        ct_bounds = torch.stack([
+            priors[:, 0, None] - (gt_centers - self.center_radius * priors[:, 2, None]),
+            priors[:, 1, None] - (gt_cys - self.center_radius * priors[:, 3, None]),
+            (gt_centers + self.center_radius * priors[:, 2, None]) - priors[:, 0, None],
+            (gt_cys + self.center_radius * priors[:, 3, None]) - priors[:, 1, None]
+        ], dim=1)
+
+        # Check if priors are inside the center boxes
+        is_in_cts = ct_bounds.min(dim=1).values > 0
         is_in_cts_all = is_in_cts.any(dim=1)
 
-        # Check if a prior is in either any ground truth box or any center box
+        # Check if priors are in either any ground truth box or any center box
         is_in_gts_or_centers = is_in_gts_all | is_in_cts_all
 
-        # Check if a prior is in both any ground truth box and any center box
-        is_in_boxes_and_centers = (is_in_gts & is_in_cts).any(dim=1)
-        is_in_boxes_and_centers = is_in_boxes_and_centers[is_in_gts_or_centers]
+        # Check if priors are in both ground truth boxes and centers
+        is_in_boxes_and_centers = is_in_gts[is_in_gts_or_centers, :] & is_in_cts[is_in_gts_or_centers, :]
         
         print("Shape of is_in_gts_or_centers: ", is_in_gts_or_centers.shape)
         print("Shape of is_in_boxes_and_centers: ", is_in_boxes_and_centers.shape)
 
         return is_in_gts_or_centers, is_in_boxes_and_centers
+
 
 
 
