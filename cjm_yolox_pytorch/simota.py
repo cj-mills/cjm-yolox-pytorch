@@ -234,31 +234,33 @@ class SimOTAAssigner():
         gt_cxs = (gt_bboxes[:, 0] + gt_bboxes[:, 2]) / 2.0
         gt_cys = (gt_bboxes[:, 1] + gt_bboxes[:, 3]) / 2.0
 
-        # Prepare the boundaries for both the ground truth boxes and the center boxes
-        bounds = torch.stack([
-            gt_bboxes[:, :2] - priors[:, :2, None],
-            priors[:, :2, None] - gt_bboxes[:, 2:],
-            gt_cxs[None, :] - self.center_radius * priors[:, 2:, None] - priors[:, :2, None],
-            priors[:, :2, None] - gt_cxs[None, :] - self.center_radius * priors[:, 2:, None]
+        # Prepare the boundaries for the ground truth boxes
+        gt_bounds = torch.stack([
+            priors[:, :2, None] - gt_bboxes[:, :2], 
+            gt_bboxes[:, 2:] - priors[:, :2, None]
         ], dim=-1)
 
-        # Check if priors are inside the boxes or centers
-        is_in_bounds = bounds.min(dim=-1).values > 0
+        # Check if priors are inside the ground truth boxes
+        is_in_gts = gt_bounds.min(dim=-1).values > 0
+        is_in_gts_all = is_in_gts.any(dim=1)
 
-        # Check if priors are in any ground truth box
-        is_in_gts_all = is_in_bounds[:2].any(dim=2).any(dim=0)
+        # Prepare the boundaries for the center boxes
+        ct_bounds = torch.stack([
+            priors[:, :2, None] - (gt_cxs[None, :] - self.center_radius * priors[:, 2:, None]), 
+            (gt_cxs[None, :] + self.center_radius * priors[:, 2:, None]) - priors[:, :2, None]
+        ], dim=-1)
 
-        # Check if priors are in any center box
-        is_in_cts_all = is_in_bounds[2:].any(dim=2).any(dim=0)
+        # Check if priors are inside the center boxes
+        is_in_cts = ct_bounds.min(dim=-1).values > 0
+        is_in_cts_all = is_in_cts.any(dim=1)
 
         # Check if priors are in either any ground truth box or any center box
         is_in_gts_or_centers = is_in_gts_all | is_in_cts_all
 
         # Check if priors are in both ground truth boxes and centers
-        is_in_boxes_and_centers = (is_in_gts_all & is_in_cts_all)
+        is_in_boxes_and_centers = is_in_gts_all & is_in_cts_all
 
         return is_in_gts_or_centers, is_in_boxes_and_centers
-
 
 
     
