@@ -161,64 +161,6 @@ class SimOTAAssigner():
         max_overlaps[valid_mask] = matched_pred_ious
         return AssignResult(num_gt, assigned_gt_inds, max_overlaps, category_labels=assigned_labels)
 
-    def get_in_gt_and_in_center_info(self, priors, gt_bboxes):
-        """Get the information about whether priors are in ground truth boxes or center.
-
-        Args:
-            priors (Tensor): All priors of one image, a 2D-Tensor with shape [num_priors, 4]
-                in [cx, xy, stride_w, stride_y] format.
-            gt_bboxes (Tensor): Ground truth bboxes of one image, a 2D-Tensor
-                with shape [num_gts, 4] in [tl_x, tl_y, br_x, br_y] format.
-
-        Returns:
-            Tuple[Tensor, Tensor]: The first tensor indicates if the prior is in any ground truth box or center, 
-            the second tensor specifies if the prior is in both the ground truth box and center.
-        """
-
-        # Repeat the prior values across the new dimension to facilitate the calculations
-        repeated_x = priors[:, 0, None]
-        repeated_y = priors[:, 1, None]
-        repeated_stride_x = priors[:, 2, None]
-        repeated_stride_y = priors[:, 3, None]
-
-        # Calculate deltas (distances from priors to the boundaries of the ground truth boxes)
-        deltas = torch.stack([
-            repeated_x - gt_bboxes[:, 0], 
-            repeated_y - gt_bboxes[:, 1], 
-            gt_bboxes[:, 2] - repeated_x, 
-            gt_bboxes[:, 3] - repeated_y], dim=1)
-
-        # Check if any value of deltas is positive, which means the prior is within the ground truth box
-        is_in_gts = deltas.min(dim=1).values > 0
-        # Check if a prior is in any ground truth box
-        is_in_gts_all = is_in_gts.any(dim=1)
-
-        # Calculate the centers of the ground truth boxes
-        gt_cxs = (gt_bboxes[:, 0] + gt_bboxes[:, 2]) / 2.0
-        gt_cys = (gt_bboxes[:, 1] + gt_bboxes[:, 3]) / 2.0
-
-        # Calculate deltas for center boxes (distances from priors to the boundaries of the center boxes)
-        ct_deltas = torch.stack([
-            repeated_x - (gt_cxs - self.center_radius * repeated_stride_x),
-            repeated_y - (gt_cys - self.center_radius * repeated_stride_y),
-            (gt_cxs + self.center_radius * repeated_stride_x) - repeated_x,
-            (gt_cys + self.center_radius * repeated_stride_y) - repeated_y], dim=1)
-
-        # Check if any value of ct_deltas is positive, which means the prior is within the center box
-        is_in_cts = ct_deltas.min(dim=1).values > 0
-        # Check if a prior is in any center box
-        is_in_cts_all = is_in_cts.any(dim=1)
-
-        # Check if a prior is in either any ground truth box or any center box
-        is_in_gts_or_centers = is_in_gts_all | is_in_cts_all
-        # Check if a prior is in both any ground truth box and any center box
-        is_in_boxes_and_centers = (is_in_gts[is_in_gts_or_centers, :] & is_in_cts[is_in_gts_or_centers, :])
-        
-        print("Shape of is_in_gts_or_centers: ", is_in_gts_or_centers.shape)
-        print("Shape of is_in_boxes_and_centers: ", is_in_boxes_and_centers.shape)
-
-        return is_in_gts_or_centers, is_in_boxes_and_centers
-
 #     def get_in_gt_and_in_center_info(self, priors, gt_bboxes):
 #         """Get the information about whether priors are in ground truth boxes or center.
 
@@ -233,40 +175,93 @@ class SimOTAAssigner():
 #             the second tensor specifies if the prior is in both the ground truth box and center.
 #         """
 
+#         # Repeat the prior values across the new dimension to facilitate the calculations
+#         repeated_x = priors[:, 0, None]
+#         repeated_y = priors[:, 1, None]
+#         repeated_stride_x = priors[:, 2, None]
+#         repeated_stride_y = priors[:, 3, None]
+
+#         # Calculate deltas (distances from priors to the boundaries of the ground truth boxes)
+#         deltas = torch.stack([
+#             repeated_x - gt_bboxes[:, 0], 
+#             repeated_y - gt_bboxes[:, 1], 
+#             gt_bboxes[:, 2] - repeated_x, 
+#             gt_bboxes[:, 3] - repeated_y], dim=1)
+
+#         # Check if any value of deltas is positive, which means the prior is within the ground truth box
+#         is_in_gts = deltas.min(dim=1).values > 0
+#         # Check if a prior is in any ground truth box
+#         is_in_gts_all = is_in_gts.any(dim=1)
+
 #         # Calculate the centers of the ground truth boxes
 #         gt_cxs = (gt_bboxes[:, 0] + gt_bboxes[:, 2]) / 2.0
 #         gt_cys = (gt_bboxes[:, 1] + gt_bboxes[:, 3]) / 2.0
 
-#         # Prepare the boundaries for the ground truth boxes
-#         gt_bounds = torch.stack([
-#             priors[:, :2, None] - gt_bboxes[:, :2], 
-#             gt_bboxes[:, 2:] - priors[:, :2, None]
-#         ], dim=-1)
+#         # Calculate deltas for center boxes (distances from priors to the boundaries of the center boxes)
+#         ct_deltas = torch.stack([
+#             repeated_x - (gt_cxs - self.center_radius * repeated_stride_x),
+#             repeated_y - (gt_cys - self.center_radius * repeated_stride_y),
+#             (gt_cxs + self.center_radius * repeated_stride_x) - repeated_x,
+#             (gt_cys + self.center_radius * repeated_stride_y) - repeated_y], dim=1)
 
-#         # Check if priors are inside the ground truth boxes
-#         is_in_gts = gt_bounds.min(dim=-1).values > 0
-#         is_in_gts_all = is_in_gts.any(dim=1)
-
-#         # Prepare the boundaries for the center boxes
-#         ct_bounds = torch.stack([
-#             priors[:, :2, None] - (gt_cxs[None, :] - self.center_radius * priors[:, 2:, None]), 
-#             (gt_cxs[None, :] + self.center_radius * priors[:, 2:, None]) - priors[:, :2, None]
-#         ], dim=-1)
-
-#         # Check if priors are inside the center boxes
-#         is_in_cts = ct_bounds.min(dim=-1).values > 0
+#         # Check if any value of ct_deltas is positive, which means the prior is within the center box
+#         is_in_cts = ct_deltas.min(dim=1).values > 0
+#         # Check if a prior is in any center box
 #         is_in_cts_all = is_in_cts.any(dim=1)
 
-#         # Check if priors are in either any ground truth box or any center box
+#         # Check if a prior is in either any ground truth box or any center box
 #         is_in_gts_or_centers = is_in_gts_all | is_in_cts_all
-
-#         # Check if priors are in both ground truth boxes and centers
-#         is_in_boxes_and_centers = is_in_gts_all & is_in_cts_all
-        
-#         print("Shape of is_in_gts_or_centers: ", is_in_gts_or_centers.shape)
-#         print("Shape of is_in_boxes_and_centers: ", is_in_boxes_and_centers.shape)
+#         # Check if a prior is in both any ground truth box and any center box
+#         is_in_boxes_and_centers = (is_in_gts[is_in_gts_or_centers, :] & is_in_cts[is_in_gts_or_centers, :])
 
 #         return is_in_gts_or_centers, is_in_boxes_and_centers
+
+    def get_in_gt_and_in_center_info(self, priors, gt_bboxes):
+        """Get the information about whether priors are in ground truth boxes or center.
+
+        Args:
+            priors (Tensor): All priors of one image, a 2D-Tensor with shape [num_priors, 4]
+                in [cx, xy, stride_w, stride_y] format.
+            gt_bboxes (Tensor): Ground truth bboxes of one image, a 2D-Tensor
+                with shape [num_gts, 4] in [tl_x, tl_y, br_x, br_y] format.
+
+        Returns:
+            Tuple[Tensor, Tensor]: The first tensor indicates if the prior is in any ground truth box or center, 
+            the second tensor specifies if the prior is in both the ground truth box and center.
+        """
+
+        # Calculate the centers of the ground truth boxes
+        gt_cxs = (gt_bboxes[:, 0] + gt_bboxes[:, 2]) / 2.0
+        gt_cys = (gt_bboxes[:, 1] + gt_bboxes[:, 3]) / 2.0
+
+        # Prepare the boundaries for the ground truth boxes
+        gt_bounds = torch.stack([
+            priors[:, :2, None] - gt_bboxes[:, :2], 
+            gt_bboxes[:, 2:] - priors[:, :2, None]
+        ], dim=-1)
+
+        # Check if priors are inside the ground truth boxes
+        is_in_gts = gt_bounds.min(dim=-1).values > 0
+        is_in_gts_all = is_in_gts.any(dim=2)
+
+        # Prepare the boundaries for the center boxes
+        ct_bounds = torch.stack([
+            priors[:, :2, None] - (gt_cxs[None, :] - self.center_radius * priors[:, 2:, None]), 
+            (gt_cxs[None, :] + self.center_radius * priors[:, 2:, None]) - priors[:, :2, None]
+        ], dim=-1)
+
+        # Check if priors are inside the center boxes
+        is_in_cts = ct_bounds.min(dim=-1).values > 0
+        is_in_cts_all = is_in_cts.any(dim=2)
+
+        # Check if priors are in either any ground truth box or any center box
+        is_in_gts_or_centers = is_in_gts_all | is_in_cts_all
+
+        # Check if priors are in both ground truth boxes and centers
+        is_in_boxes_and_centers = (is_in_gts[is_in_gts_or_centers, :] & is_in_cts[is_in_gts_or_centers, :])
+
+        return is_in_gts_or_centers, is_in_boxes_and_centers
+
 
     
     def dynamic_k_matching(self, cost, pairwise_ious, num_gt, valid_mask):
