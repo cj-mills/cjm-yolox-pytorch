@@ -244,8 +244,12 @@ class SimOTAAssigner():
 
         # Check if priors are inside the boxes or centers
         is_in_bounds = bounds.min(dim=-1).values > 0
-        is_in_gts_all = is_in_bounds[:2].any(dim=0).any(dim=1)
-        is_in_cts_all = is_in_bounds[2:].any(dim=0).any(dim=1)
+
+        # Check if priors are in any ground truth box
+        is_in_gts_all = is_in_bounds[:2].any(dim=2).any(dim=0)
+
+        # Check if priors are in any center box
+        is_in_cts_all = is_in_bounds[2:].any(dim=2).any(dim=0)
 
         # Check if priors are in either any ground truth box or any center box
         is_in_gts_or_centers = is_in_gts_all | is_in_cts_all
@@ -254,6 +258,7 @@ class SimOTAAssigner():
         is_in_boxes_and_centers = (is_in_gts_all & is_in_cts_all)
 
         return is_in_gts_or_centers, is_in_boxes_and_centers
+
 
 
     
