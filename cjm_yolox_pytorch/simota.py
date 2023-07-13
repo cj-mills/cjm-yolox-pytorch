@@ -161,61 +161,6 @@ class SimOTAAssigner():
         max_overlaps[valid_mask] = matched_pred_ious
         return AssignResult(num_gt, assigned_gt_inds, max_overlaps, category_labels=assigned_labels)
 
-#     def get_in_gt_and_in_center_info(self, priors, gt_bboxes):
-#         """Get the information about whether priors are in ground truth boxes or center.
-
-#         Args:
-#             priors (Tensor): All priors of one image, a 2D-Tensor with shape [num_priors, 4]
-#                 in [cx, xy, stride_w, stride_y] format.
-#             gt_bboxes (Tensor): Ground truth bboxes of one image, a 2D-Tensor
-#                 with shape [num_gts, 4] in [tl_x, tl_y, br_x, br_y] format.
-
-#         Returns:
-#             Tuple[Tensor, Tensor]: The first tensor indicates if the prior is in any ground truth box or center, 
-#             the second tensor specifies if the prior is in both the ground truth box and center.
-#         """
-
-#         # Repeat the prior values across the new dimension to facilitate the calculations
-#         repeated_x = priors[:, 0, None]
-#         repeated_y = priors[:, 1, None]
-#         repeated_stride_x = priors[:, 2, None]
-#         repeated_stride_y = priors[:, 3, None]
-
-#         # Calculate deltas (distances from priors to the boundaries of the ground truth boxes)
-#         deltas = torch.stack([
-#             repeated_x - gt_bboxes[:, 0], 
-#             repeated_y - gt_bboxes[:, 1], 
-#             gt_bboxes[:, 2] - repeated_x, 
-#             gt_bboxes[:, 3] - repeated_y], dim=1)
-
-#         # Check if any value of deltas is positive, which means the prior is within the ground truth box
-#         is_in_gts = deltas.min(dim=1).values > 0
-#         # Check if a prior is in any ground truth box
-#         is_in_gts_all = is_in_gts.any(dim=1)
-
-#         # Calculate the centers of the ground truth boxes
-#         gt_cxs = (gt_bboxes[:, 0] + gt_bboxes[:, 2]) / 2.0
-#         gt_cys = (gt_bboxes[:, 1] + gt_bboxes[:, 3]) / 2.0
-
-#         # Calculate deltas for center boxes (distances from priors to the boundaries of the center boxes)
-#         ct_deltas = torch.stack([
-#             repeated_x - (gt_cxs - self.center_radius * repeated_stride_x),
-#             repeated_y - (gt_cys - self.center_radius * repeated_stride_y),
-#             (gt_cxs + self.center_radius * repeated_stride_x) - repeated_x,
-#             (gt_cys + self.center_radius * repeated_stride_y) - repeated_y], dim=1)
-
-#         # Check if any value of ct_deltas is positive, which means the prior is within the center box
-#         is_in_cts = ct_deltas.min(dim=1).values > 0
-#         # Check if a prior is in any center box
-#         is_in_cts_all = is_in_cts.any(dim=1)
-
-#         # Check if a prior is in either any ground truth box or any center box
-#         is_in_gts_or_centers = is_in_gts_all | is_in_cts_all
-#         # Check if a prior is in both any ground truth box and any center box
-#         is_in_boxes_and_centers = (is_in_gts[is_in_gts_or_centers, :] & is_in_cts[is_in_gts_or_centers, :])
-
-#         return is_in_gts_or_centers, is_in_boxes_and_centers
-    
     def get_in_gt_and_in_center_info(self, priors, gt_bboxes):
         """Get the information about whether priors are in ground truth boxes or center.
 
@@ -230,101 +175,67 @@ class SimOTAAssigner():
             the second tensor specifies if the prior is in both the ground truth box and center.
         """
 
+        # Repeat the prior values across the new dimension to facilitate the calculations
+        repeated_x = priors[:, 0, None]
+        repeated_y = priors[:, 1, None]
+        repeated_stride_x = priors[:, 2, None]
+        repeated_stride_y = priors[:, 3, None]
+
+        # Calculate deltas (distances from priors to the boundaries of the ground truth boxes)
+        deltas = torch.stack([
+            repeated_x - gt_bboxes[:, 0], 
+            repeated_y - gt_bboxes[:, 1], 
+            gt_bboxes[:, 2] - repeated_x, 
+            gt_bboxes[:, 3] - repeated_y], dim=1)
+
+        # Check if any value of deltas is positive, which means the prior is within the ground truth box
+        is_in_gts = deltas.min(dim=1).values > 0
+        # Check if a prior is in any ground truth box
+        is_in_gts_all = is_in_gts.any(dim=1)
+
         # Calculate the centers of the ground truth boxes
         gt_cxs = (gt_bboxes[:, 0] + gt_bboxes[:, 2]) / 2.0
         gt_cys = (gt_bboxes[:, 1] + gt_bboxes[:, 3]) / 2.0
 
-        # Prepare the boundaries for the ground truth boxes
-        gt_bounds = torch.stack([
-            priors[:, :2, None] - gt_bboxes[:, :2], 
-            gt_bboxes[:, 2:] - priors[:, :2, None]
-        ], dim=-1)
+        # Calculate deltas for center boxes (distances from priors to the boundaries of the center boxes)
+        ct_deltas = torch.stack([
+            repeated_x - (gt_cxs - self.center_radius * repeated_stride_x),
+            repeated_y - (gt_cys - self.center_radius * repeated_stride_y),
+            (gt_cxs + self.center_radius * repeated_stride_x) - repeated_x,
+            (gt_cys + self.center_radius * repeated_stride_y) - repeated_y], dim=1)
 
-        print("Shape of gt_bounds: ", gt_bounds.shape)
-
-        # Check if priors are inside the ground truth boxes
-        is_in_gts = gt_bounds.min(dim=-1).values > 0
-        is_in_gts_all = is_in_gts.any(dim=1)
-
-        # Prepare the boundaries for the center boxes
-        ct_bounds = torch.stack([
-            priors[:, :2, None] - (gt_cxs[None, :] - self.center_radius * priors[:, 2:, None]), 
-            (gt_cxs[None, :] + self.center_radius * priors[:, 2:, None]) - priors[:, :2, None]
-        ], dim=-1)
-
-        print("Shape of ct_bounds: ", ct_bounds.shape)
-
-        # Check if priors are inside the center boxes
-        is_in_cts = ct_bounds.min(dim=-1).values > 0
+        # Check if any value of ct_deltas is positive, which means the prior is within the center box
+        is_in_cts = ct_deltas.min(dim=1).values > 0
+        # Check if a prior is in any center box
         is_in_cts_all = is_in_cts.any(dim=1)
 
-        # Check if priors are in either any ground truth box or any center box
+        # Check if a prior is in either any ground truth box or any center box
         is_in_gts_or_centers = is_in_gts_all | is_in_cts_all
-
-        # Check if priors are in both ground truth boxes and centers
-        is_in_boxes_and_centers = is_in_gts_all & is_in_cts_all
+        # Check if a prior is in both any ground truth box and any center box
+        is_in_boxes_and_centers = (is_in_gts[is_in_gts_or_centers, :] & is_in_cts[is_in_gts_or_centers, :])
 
         return is_in_gts_or_centers, is_in_boxes_and_centers
-
-
-
-
-    
-#     def dynamic_k_matching(self, cost, pairwise_ious, num_gt, valid_mask):
-#         """
-#         This method performs dynamic k-matching. This is a core part of the SimOTA assignment
-#         where each ground truth object dynamically chooses k bounding box predictions that best 
-#         match itself according to the cost matrix. Then, if there are any conflicts (i.e., one 
-#         prediction is selected by multiple ground truths), the conflicts are resolved by choosing 
-#         the pair with the smallest cost.
-
-#         Args:
-#             cost (Tensor): A 2D tensor representing the cost matrix calculated from both 
-#                 classification cost and regression IoU cost. Shape is [num_priors, num_gts].
-#             pairwise_ious (Tensor): A 2D tensor representing IoU scores between predictions and 
-#                 ground truths. Shape is [num_priors, num_gts].
-#             num_gt (int): The number of ground truth boxes.
-#             valid_mask (Tensor): A 1D tensor representing which predicted boxes are valid based 
-#                 on being in gt bboxes and in centers. Shape is [num_priors].
-
-#         Returns:
-#             matched_pred_ious (Tensor): IoU scores for matched pairs. Shape is [num_priors].
-#             matched_gt_inds (Tensor): The indices of the ground truth for each prior. Shape is [num_priors].
-#         """
-#         # Initialize the matching matrix with zeros
-#         matching_matrix = torch.zeros_like(cost)
-
-#         # Select the top k IoUs for dynamic-k calculation
-#         topk_ious, _ = torch.topk(pairwise_ious, self.candidate_topk, dim=0)
-
-#         # Calculate dynamic k for each ground truth
-#         dynamic_ks = topk_ious.sum(0).int().clamp(min=1)
-
-#         # For each ground truth, find top k matching priors based on smallest cost
-#         _, pos_idx = cost.topk(k=dynamic_ks.max().item(), dim=0, largest=False)
-#         for gt_idx in range(num_gt):
-#             matching_matrix[pos_idx[:dynamic_ks[gt_idx], gt_idx], gt_idx] = 1
-
-#         # If a prior matches multiple ground truths, keep only the one with smallest cost
-#         prior_match_gt_mask = matching_matrix.sum(1) > 1
-#         if prior_match_gt_mask.any():
-#             _, cost_argmin = cost[prior_match_gt_mask].min(dim=1)
-#             matching_matrix[prior_match_gt_mask] *= 0
-#             matching_matrix[prior_match_gt_mask, cost_argmin] = 1
-
-#         # Update the valid mask based on final matches
-#         valid_mask[valid_mask.clone()] = matching_matrix.sum(1) > 0
-
-#         # Get the final matched ground truth indices and IoUs for valid predicted boxes
-#         fg_mask_inboxes = matching_matrix.sum(1) > 0
-#         matched_gt_inds = matching_matrix[fg_mask_inboxes].argmax(1)
-#         matched_pred_ious = (matching_matrix * pairwise_ious).sum(1)[fg_mask_inboxes]
-
-#         return matched_pred_ious, matched_gt_inds
     
     def dynamic_k_matching(self, cost, pairwise_ious, num_gt, valid_mask):
         """
-        ... [the docstring remains the same] ...
+        This method performs dynamic k-matching. This is a core part of the SimOTA assignment
+        where each ground truth object dynamically chooses k bounding box predictions that best 
+        match itself according to the cost matrix. Then, if there are any conflicts (i.e., one 
+        prediction is selected by multiple ground truths), the conflicts are resolved by choosing 
+        the pair with the smallest cost.
+
+        Args:
+            cost (Tensor): A 2D tensor representing the cost matrix calculated from both 
+                classification cost and regression IoU cost. Shape is [num_priors, num_gts].
+            pairwise_ious (Tensor): A 2D tensor representing IoU scores between predictions and 
+                ground truths. Shape is [num_priors, num_gts].
+            num_gt (int): The number of ground truth boxes.
+            valid_mask (Tensor): A 1D tensor representing which predicted boxes are valid based 
+                on being in gt bboxes and in centers. Shape is [num_priors].
+
+        Returns:
+            matched_pred_ious (Tensor): IoU scores for matched pairs. Shape is [num_priors].
+            matched_gt_inds (Tensor): The indices of the ground truth for each prior. Shape is [num_priors].
         """
 
         # Initialize the matching matrix with zeros
