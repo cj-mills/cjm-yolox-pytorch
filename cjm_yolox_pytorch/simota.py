@@ -230,17 +230,17 @@ class SimOTAAssigner():
             the second tensor specifies if the prior is in both the ground truth box and center.
         """
 
-        # Calculate the centers and radii of the ground truth boxes
+        # Calculate the centers of the ground truth boxes
         gt_centers = (gt_bboxes[:, [0,1]] + gt_bboxes[:, [2,3]]) / 2.0
-        gt_radii = self.center_radius * priors[:, [2,3]]
 
-        # Calculate the distances from priors to the boundaries of the ground truth boxes and center boxes
-        deltas = priors[:, None, :2] - gt_bboxes[:, :, :2]
-        ct_deltas = priors[:, None, :2] - (gt_centers[:, None, :] + torch.tensor([-1, 1])[None, None, :] * gt_radii[:, :, None])
+        # Prepare the boundaries for the ground truth boxes and center boxes
+        gt_bounds = torch.stack([priors[:, None, :2] - gt_bboxes[:, :, :2], gt_bboxes[:, :, 2:] - priors[:, None, :2]], dim=-1)
+        ct_bounds = torch.stack([priors[:, None, :2] - (gt_centers[:, :, None] - self.center_radius * priors[:, 2:3, None]), 
+                                 (gt_centers[:, :, None] + self.center_radius * priors[:, 2:3, None]) - priors[:, None, :2]], dim=-1)
 
-        # Check if any value of deltas and ct_deltas is positive, which means the prior is within the box
-        is_in_gts = deltas.clamp(min=0).max(dim=2).values == 0
-        is_in_cts = ct_deltas.clamp(min=0).max(dim=2).values == 0
+        # Check if priors are inside the ground truth boxes and center boxes
+        is_in_gts = gt_bounds.min(dim=-1).values > 0
+        is_in_cts = ct_bounds.min(dim=-1).values > 0
         
         print("Shape of is_in_gts: ", is_in_gts.shape)
         print("Shape of is_in_cts: ", is_in_cts.shape)
@@ -253,14 +253,14 @@ class SimOTAAssigner():
         is_in_gts_or_centers = is_in_gts_all | is_in_cts_all
 
         # Check if a prior is in both any ground truth box and any center box
-        is_in_boxes_and_centers = is_in_gts & is_in_cts
-        is_in_boxes_and_centers = is_in_boxes_and_centers.any(dim=1)
+        is_in_boxes_and_centers = (is_in_gts & is_in_cts).any(dim=1)
         is_in_boxes_and_centers = is_in_boxes_and_centers[is_in_gts_or_centers]
         
         print("Shape of is_in_gts_or_centers: ", is_in_gts_or_centers.shape)
         print("Shape of is_in_boxes_and_centers: ", is_in_boxes_and_centers.shape)
-        
+
         return is_in_gts_or_centers, is_in_boxes_and_centers
+
 
 
 
