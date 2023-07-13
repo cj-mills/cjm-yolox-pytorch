@@ -240,7 +240,7 @@ class SimOTAAssigner():
             gt_bboxes[:, 2:] - priors[:, :2, None]
         ], dim=-1)
 
-        print("Shape of gt_bounds: ", gt_bounds.shape)
+#         print("Shape of gt_bounds: ", gt_bounds.shape)
 
         # Check if priors are inside the ground truth boxes
         is_in_gts = gt_bounds.min(dim=-1).values > 0
@@ -253,11 +253,11 @@ class SimOTAAssigner():
             (gt_cxs[None, :] + self.center_radius * priors[:, 2:, None]) - priors[:, :2, None]
         ], dim=-1)
 
-        print("Shape of ct_bounds: ", ct_bounds.shape)
+#         print("Shape of ct_bounds: ", ct_bounds.shape)
 
         # Check if priors are inside the center boxes
         is_in_cts = ct_bounds.min(dim=-1).values > 0
-        print("Shape of is_in_cts: ", is_in_cts.shape)
+#         print("Shape of is_in_cts: ", is_in_cts.shape)
         is_in_cts_all = is_in_cts.any(dim=1)
 
         # Check if priors are in either any ground truth box or any center box
@@ -266,6 +266,7 @@ class SimOTAAssigner():
         # Check if priors are in both ground truth boxes and centers
         is_in_boxes_and_centers = is_in_gts_all & is_in_cts_all
         
+        print("Shape of is_in_gts_or_centers: ", is_in_gts_or_centers.shape)
         print("Shape of is_in_boxes_and_centers: ", is_in_boxes_and_centers.shape)
 
         return is_in_gts_or_centers, is_in_boxes_and_centers
