@@ -240,6 +240,8 @@ class SimOTAAssigner():
         deltas = priors[:, [0,1], None] - gt_bboxes[:, None]
         ct_deltas = priors[:, [0,1], None] - (gt_centers[None, :] + torch.tensor([-1, 1])[None, None, :] * gt_radii[:, :, None])
 
+        print("Shape of ct_deltas: ", ct_deltas.shape)
+        
         # Check if any value of deltas and ct_deltas is positive, which means the prior is within the box
         is_in_gts = deltas.clamp(min=0).max(dim=2).values == 0
         is_in_cts = ct_deltas.clamp(min=0).max(dim=2).values == 0
