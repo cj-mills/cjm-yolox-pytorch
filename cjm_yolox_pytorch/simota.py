@@ -228,22 +228,27 @@ class SimOTAAssigner():
 
         # Calculate the centers of the ground truth boxes
         gt_cxs = (gt_bboxes[:, 0] + gt_bboxes[:, 2]) / 2.0
+        gt_cys = (gt_bboxes[:, 1] + gt_bboxes[:, 3]) / 2.0
 
         # Prepare the boundaries for both the ground truth boxes and the center boxes
         bounds = torch.stack([
-            priors[:, :2, None] - gt_bboxes[:, :2], 
-            gt_bboxes[:, 2:] - priors[:, :2, None],
-            priors[:, :2, None] - (gt_cxs[None, :] - self.center_radius * priors[:, 2:, None]),
-            (gt_cxs[None, :] + self.center_radius * priors[:, 2:, None]) - priors[:, :2, None]
-        ], dim=-1)
+            priors[:, 0, None] - gt_bboxes[:, 0], 
+            priors[:, 1, None] - gt_bboxes[:, 1], 
+            gt_bboxes[:, 2] - priors[:, 0, None], 
+            gt_bboxes[:, 3] - priors[:, 1, None],
+            priors[:, 0, None] - (gt_cxs - self.center_radius * priors[:, 2, None]),
+            priors[:, 1, None] - (gt_cys - self.center_radius * priors[:, 3, None]),
+            (gt_cxs + self.center_radius * priors[:, 2, None]) - priors[:, 0, None],
+            (gt_cys + self.center_radius * priors[:, 3, None]) - priors[:, 1, None]
+        ], dim=1)
 
         # Check if priors are inside the boxes or centers
-        is_in_bounds = bounds.min(dim=-1).values > 0
+        is_in_bounds = bounds.min(dim=1).values > 0
         is_in_gts_or_centers = is_in_bounds.any(dim=1)
 
         # Check if priors are in both ground truth boxes and centers
-        is_in_gts = is_in_bounds[:, :2].any(dim=2)
-        is_in_cts = is_in_bounds[:, 2:].any(dim=2)
+        is_in_gts = is_in_bounds[:, :4].any(dim=1)
+        is_in_cts = is_in_bounds[:, 4:].any(dim=1)
         is_in_boxes_and_centers = is_in_gts & is_in_cts
         is_in_boxes_and_centers = is_in_boxes_and_centers[is_in_gts_or_centers]
 
