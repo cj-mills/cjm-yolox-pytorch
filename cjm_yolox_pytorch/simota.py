@@ -4,6 +4,7 @@
 __all__ = ['AssignResult', 'SimOTAAssigner']
 
 # %% ../nbs/03_simota.ipynb 4
+from dataclasses import dataclass, field
 from typing import Any, Type, List, Optional, Callable, Tuple, Union
 from functools import partial
 
@@ -12,8 +13,9 @@ import torch
 import torch.nn.functional as F
 import torchvision
 
-# %% ../nbs/03_simota.ipynb 7
-class AssignResult():
+# %% ../nbs/03_simota.ipynb 8
+@dataclass
+class AssignResult:
     """
     Stores assignments between predicted bounding boxes and actual truth bounding boxes.
     
@@ -22,19 +24,12 @@ class AssignResult():
     - [OpenMMLab's Implementation](https://github.com/open-mmlab/mmdetection/blob/d64e719172335fa3d7a757a2a3636bd19e9efb62/mmdet/core/bbox/assigners/assign_result.py#L7)
 
     """
+    num_ground_truth_boxes: int # The number of actual truth boxes considered when computing this assignment
+    ground_truth_box_indices: torch.LongTensor # For each predicted bounding box, this indicates the 1-based index of the assigned actual truth box. 0 means unassigned and -1 means ignore.
+    max_iou_values: torch.FloatTensor # The Intersection over Union (IoU) between the predicted bounding box and its assigned actual truth box.
+    category_labels: torch.LongTensor = field(default=None) # If specified, for each predicted bounding box, this indicates the category label of the assigned actual truth box.
 
-    def __init__(self, 
-                 num_ground_truth_boxes:int, # The number of actual truth boxes considered when computing this assignment
-                 ground_truth_box_indices:torch.LongTensor, # For each predicted bounding box, this indicates the 1-based index of the assigned actual truth box. 0 means unassigned and -1 means ignore.
-                 max_iou_values:torch.FloatTensor, # The Intersection over Union (IoU) between the predicted bounding box and its assigned actual truth box.
-                 category_labels:torch.LongTensor=None # If specified, for each predicted bounding box, this indicates the category label of the assigned actual truth box.
-                ):
-        self.num_ground_truth_boxes = num_ground_truth_boxes
-        self.ground_truth_box_indices = ground_truth_box_indices
-        self.max_iou_values = max_iou_values
-        self.category_labels = category_labels
-
-# %% ../nbs/03_simota.ipynb 9
+# %% ../nbs/03_simota.ipynb 10
 class SimOTAAssigner():
     """
     Computes matching between predictions and ground truth.
