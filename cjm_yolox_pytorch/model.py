@@ -3,7 +3,7 @@
 # %% auto 0
 __all__ = ['MODEL_TYPES', 'CSP_DARKNET_CFGS', 'PAFPN_CFGS', 'HEAD_CFGS', 'OPENMMLAB_CKPT_URL', 'PRETRAINED_URLS', 'NORM_CFG',
            'NORM_STATS', 'MODEL_CFGS', 'ConvModule', 'DarknetBottleneck', 'CSPLayer', 'Focus', 'SPPBottleneck',
-           'CSPDarknet', 'YOLOXPAFPN', 'YOLOXHead', 'YOLOX', 'kaiming_init', 'init_head', 'build_model']
+           'CSPDarknet', 'YOLOXPAFPN', 'YOLOXHead', 'YOLOX', 'init_head', 'build_model']
 
 # %% ../nbs/00_model.ipynb 4
 import os
@@ -69,7 +69,7 @@ MODEL_CFGS = {model_type: {**CSP_DARKNET_CFGS[model_type],
                             **{k:{"pretrained": v != None} for k,v in PRETRAINED_URLS.items()}[model_type]} 
                for model_type in MODEL_TYPES}
 
-# %% ../nbs/00_model.ipynb 13
+# %% ../nbs/00_model.ipynb 11
 class ConvModule(nn.Module):
     """
     Configurable block used for Convolution2d-Normalization-Activation blocks.
@@ -117,13 +117,12 @@ class ConvModule(nn.Module):
         # Apply activation function and return result
         return self.activate(x)
 
-# %% ../nbs/00_model.ipynb 16
+# %% ../nbs/00_model.ipynb 14
 class DarknetBottleneck(nn.Module):
     """
     Basic Darknet bottleneck block used in Darknet.
     
-    This class represents a basic bottleneck block used in Darknet, which 
-    consists of two convolutional layers with a possible identity shortcut.
+    This class represents a basic bottleneck block used in Darknet, which consists of two convolutional layers with a possible identity shortcut.
     
     Based on OpenMMLab's implementation in the mmdetection library:
     
@@ -172,7 +171,7 @@ class DarknetBottleneck(nn.Module):
 
         return out
 
-# %% ../nbs/00_model.ipynb 19
+# %% ../nbs/00_model.ipynb 17
 class CSPLayer(nn.Module):
     """
     Cross Stage Partial Layer (CSPLayer).
@@ -229,7 +228,7 @@ class CSPLayer(nn.Module):
 
         return self.final_conv(torch.cat((main_path, shortcut_path), dim=1))
 
-# %% ../nbs/00_model.ipynb 22
+# %% ../nbs/00_model.ipynb 20
 class Focus(nn.Module):
     """
     Focus width and height information into channel space.
@@ -285,7 +284,7 @@ class Focus(nn.Module):
         return self.conv(x)
 
 
-# %% ../nbs/00_model.ipynb 25
+# %% ../nbs/00_model.ipynb 23
 class SPPBottleneck(nn.Module):
     """
     Spatial Pyramid Pooling layer used in YOLOv3-SPP
@@ -330,26 +329,14 @@ class SPPBottleneck(nn.Module):
 
         return self.conv2(x)
 
-# %% ../nbs/00_model.ipynb 27
+# %% ../nbs/00_model.ipynb 25
 class CSPDarknet(nn.Module):
     """
-    CSP-Darknet backbone
+    The `CSPDarknet` class implements a CSPDarknet backbone, a convolutional neural network (CNN) used in various image recognition tasks. The CSPDarknet backbone forms an integral part of the YOLOX object detection model.
     
     Based on OpenMMLab's implementation in the mmdetection library:
     
     - [OpenMMLab's Implementation](https://github.com/open-mmlab/mmdetection/blob/d64e719172335fa3d7a757a2a3636bd19e9efb62/mmdet/models/backbones/csp_darknet.py#L124)
-    
-    #### Pseudocode
-    Function forward(input_tensor x):
-
-    1. Initialize an empty list 'outs' to store intermediate outputs.
-    2. For each index and layer name in the model's layers:
-       a. Retrieve the layer corresponding to the current layer name.
-       b. Pass 'x' through the retrieved layer and update 'x' with the output.
-       c. If the current index is in the set of output indices:
-          i. Append 'x' to 'outs'.
-    3. Convert 'outs' to a tuple and return it as the final output.
-
     """
 
     # Architecture settings for P5 and P6
@@ -445,184 +432,138 @@ class CSPDarknet(nn.Module):
                 outs.append(x)
         return tuple(outs)
 
-# %% ../nbs/00_model.ipynb 30
+# %% ../nbs/00_model.ipynb 29
 class YOLOXPAFPN(nn.Module):
     """
     Path Aggregation Feature Pyramid Network (PAFPN) used in YOLOX.
     
+    In object detection tasks, this class merges the feature maps from different layers of the backbone network. It helps in aggregating multi-scale feature maps to enhance the detection of objects of various sizes.
+    
     Based on OpenMMLab's implementation in the mmdetection library:
     
     - [OpenMMLab's Implementation](https://github.com/open-mmlab/mmdetection/blob/d64e719172335fa3d7a757a2a3636bd19e9efb62/mmdet/models/necks/yolox_pafpn.py#L14)
-    
-    
-    #### Pseudocode
-    Function forward(list inputs):
-
-    1. Assert that the length of inputs equals the length of in_channels.
-    2. Initialize inner_outs with the last feature map in inputs.
-    3. For each index in in_channels in reverse (exclude first):
-       a. Set feature_high to the first feature map in inner_outs.
-       b. Set feature_low to the corresponding input feature map.
-       c. Reduce the channels of feature_high using the corresponding reduce_layer. Update feature_high in inner_outs.
-       d. Upsample feature_high to the spatial size of feature_low.
-       e. Concatenate upsampled feature_high and feature_low, and pass the result through the corresponding CSPLayer. The output is inner_out.
-       f. Add inner_out to the beginning of inner_outs.
-    4. Initialize outs with the first feature map from inner_outs.
-    5. For each index in in_channels (exclude last):
-       a. Set feature_low to the last feature map in outs.
-       b. Set feature_high to the corresponding feature map in inner_outs.
-       c. Downsample feature_low to the spatial size of feature_high.
-       d. Concatenate downsampled feature_low and feature_high, and pass the result through the corresponding CSPLayer. The output is out.
-       e. Add out to the end of outs.
-    6. For each convolutional layer (conv) in out_convs:
-       a. Apply conv to the corresponding feature map in outs.
-    7. Return the tuple of feature maps in outs as the final output.
     """
+    
     def __init__(self,
-                 in_channels, # The number of input channels for each level of the feature pyramid.
-                 out_channels, # The number of output channels for each level of the feature pyramid.
-                 num_csp_blocks=3, # The number of bottlenecks in each CSPLayer.
-                 upsample_cfg=dict(scale_factor=2, mode='nearest'), # The configuration for the upsampling operation.
-                 momentum=0.03, # The momentum for the batch normalization in the ConvModule.
-                 eps=0.001 # The epsilon for the batch normalization in the ConvModule.
-                ):
+                 in_channels,
+                 out_channels,
+                 num_csp_blocks=3,
+                 upsample_cfg=dict(scale_factor=2, mode='nearest'),
+                 momentum=0.03,
+                 eps=0.001):
         super(YOLOXPAFPN, self).__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
+        self.upsample = nn.Upsample(**upsample_cfg)
 
         # build top-down blocks, which includes reduce layers and CSP blocks
-        self.upsample = nn.Upsample(**upsample_cfg)
-        self.reduce_layers = nn.ModuleList()
-        self.top_down_blocks = nn.ModuleList()
-        for idx in range(len(in_channels) - 1, 0, -1):
-            # add reducing layers for channel-wise feature reduction
-            self.reduce_layers.append(
-                ConvModule(
-                    in_channels[idx],
-                    in_channels[idx - 1],
-                    kernel_size=(1, 1), 
-                    stride=(1, 1),
-                    padding=0,
-                    bias=False,
-                    momentum=momentum,
-                    eps=eps,
-                    affine=True, 
-                    track_running_stats=True
-                ))
-            # add CSP layers for feature learning
-            self.top_down_blocks.append(
-                CSPLayer(
-                    in_channels[idx - 1] * 2,
-                    in_channels[idx - 1],
-                    num_blocks=num_csp_blocks,
-                    add_identity=False))
+        self.reduce_layers = nn.ModuleList([
+            ConvModule(
+                in_channels[idx],
+                in_channels[idx - 1],
+                kernel_size=(1, 1),
+                stride=(1, 1),
+                padding=0,
+                bias=False,
+                momentum=momentum,
+                eps=eps,
+                affine=True,
+                track_running_stats=True
+            ) for idx in range(len(in_channels) - 1, 0, -1)
+        ])
+        self.top_down_blocks = nn.ModuleList([
+            CSPLayer(
+                in_channels[idx - 1] * 2,
+                in_channels[idx - 1],
+                num_blocks=num_csp_blocks,
+                add_identity=False
+            ) for idx in range(len(in_channels) - 1, 0, -1)
+        ])
 
         # build bottom-up blocks, which includes downsampling layers and CSP blocks
-        self.downsamples = nn.ModuleList()
-        self.bottom_up_blocks = nn.ModuleList()
-        for idx in range(len(in_channels) - 1):
-            # add downsampling layers for spatial reduction
-            self.downsamples.append(
-                ConvModule(
-                    in_channels[idx],
-                    in_channels[idx],
-                    3,
-                    stride=2,
-                    padding=1,
-                    bias=False,
-                    momentum=momentum,
-                    eps=eps,
-                    affine=True, 
-                    track_running_stats=True
-                ))
-            # add CSP layers for feature learning
-            self.bottom_up_blocks.append(
-                CSPLayer(
-                    in_channels[idx] * 2,
-                    in_channels[idx + 1],
-                    num_blocks=num_csp_blocks,
-                    add_identity=False))
+        self.downsamples = nn.ModuleList([
+            ConvModule(
+                in_channels[idx],
+                in_channels[idx],
+                3,
+                stride=2,
+                padding=1,
+                bias=False,
+                momentum=momentum,
+                eps=eps,
+                affine=True,
+                track_running_stats=True
+            ) for idx in range(len(in_channels) - 1)
+        ])
+        self.bottom_up_blocks = nn.ModuleList([
+            CSPLayer(
+                in_channels[idx] * 2,
+                in_channels[idx + 1],
+                num_blocks=num_csp_blocks,
+                add_identity=False
+            ) for idx in range(len(in_channels) - 1)
+        ])
 
         # build output convolutions for each level
-        self.out_convs = nn.ModuleList()
-        for i in range(len(in_channels)):
-            self.out_convs.append(
-                ConvModule(
-                    in_channels[i],
-                    out_channels,
-                    1,
-                    stride=(1, 1),
-                    padding=0,
-                    bias=False,
-                    momentum=momentum,
-                    eps=eps,
-                    affine=True, 
-                    track_running_stats=True))
+        self.out_convs = nn.ModuleList([
+            ConvModule(
+                in_channels[i],
+                out_channels,
+                1,
+                stride=(1, 1),
+                padding=0,
+                bias=False,
+                momentum=momentum,
+                eps=eps,
+                affine=True,
+                track_running_stats=True
+            ) for i in range(len(in_channels))
+        ])
 
     def forward(self, inputs):
-        
         assert len(inputs) == len(self.in_channels)
 
         # top-down path
-        inner_outs = [inputs[-1]]
-        for idx in range(len(self.in_channels) - 1, 0, -1):
-            feat_heigh = inner_outs[0]
-            feat_low = inputs[idx - 1]
-            # reduce the channel dimension of the higher feature map
-            feat_heigh = self.reduce_layers[len(self.in_channels) - 1 - idx](feat_heigh)
-            inner_outs[0] = feat_heigh
-
-            # upsample the higher feature map to the same spatial size as the lower one
-            upsample_feat = self.upsample(feat_heigh)
-
-            # concatenate the upsampled higher feature map and the lower one, and feed them into the CSPLayer
-            inner_out = self.top_down_blocks[len(self.in_channels) - 1 - idx](
-                torch.cat([upsample_feat, feat_low], 1))
-            # collect the output feature maps
-            inner_outs.insert(0, inner_out)
+        inner_outs = self._top_down(inputs)
 
         # bottom-up path
-        outs = [inner_outs[0]]
-        for idx in range(len(self.in_channels) - 1):
-            feat_low = outs[-1]
-            feat_height = inner_outs[idx + 1]
-            # downsample the lower feature map to the same spatial size as the higher one
-            downsample_feat = self.downsamples[idx](feat_low)
-            # concatenate the downsampled lower feature map and the higher one, and feed them into the CSPLayer
-            out = self.bottom_up_blocks[idx](
-                torch.cat([downsample_feat, feat_height], 1))
-            # collect the output feature maps
-            outs.append(out)
+        outs = self._bottom_up(inner_outs)
 
         # apply the output convolutions to the feature maps
-        for idx, conv in enumerate(self.out_convs):
-            outs[idx] = conv(outs[idx])
+        outs = [conv(out) for out, conv in zip(outs, self.out_convs)]
 
         return tuple(outs)
+
+    def _top_down(self, inputs):
+        inner_outs = [inputs[-1]]
+        for idx, (reduce_layer, block) in enumerate(zip(self.reduce_layers, self.top_down_blocks)):
+            feat_high = reduce_layer(inner_outs[0])
+            inner_outs[0] = feat_high
+            upsample_feat = self.upsample(feat_high)
+            inner_out = block(torch.cat([upsample_feat, inputs[len(inputs) - 2 - idx]], 1))
+            inner_outs.insert(0, inner_out)
+        return inner_outs
+
+    def _bottom_up(self, inner_outs):
+        outs = [inner_outs[0]]
+        for idx, (downsample, block) in enumerate(zip(self.downsamples, self.bottom_up_blocks)):
+            downsample_feat = downsample(outs[-1])
+            out = block(torch.cat([downsample_feat, inner_outs[idx + 1]], 1))
+            outs.append(out)
+        return outs
 
 # %% ../nbs/00_model.ipynb 33
 class YOLOXHead(nn.Module):
     """
-    The head of YOLOX model <https://arxiv.org/abs/2107.08430>, used for bounding box prediction.
+    The `YOLOXHead` class is a PyTorch module that implements the head of a YOLOX model <https://arxiv.org/abs/2107.08430>, used for bounding box prediction.
+    
+    The head takes as input feature maps at multiple scale levels (e.g., from a feature pyramid network) and outputs predicted class scores, bounding box coordinates, and objectness scores for each scale level.
     
     Based on OpenMMLab's implementation in the mmdetection library:
     
     - [OpenMMLab's Implementation](https://github.com/open-mmlab/mmdetection/blob/d64e719172335fa3d7a757a2a3636bd19e9efb62/mmdet/models/dense_heads/yolox_head.py#L20)
-    
-    #### Pseudocode
-    Function forward(feats):
-
-    1. For each scale level in feats, perform the following steps:
-        a. Pass the scale level feature through the classification convolutions (cls_convs) to produce a feature map (cls_feat).
-        b. Pass the same scale level feature through the regression convolutions (reg_convs) to produce another feature map (reg_feat).
-        c. Apply the classification predictor convolution (conv_cls) on the classification feature map (cls_feat) to get the classification scores (cls_score).
-        d. Apply the regression predictor convolution (conv_reg) on the regression feature map (reg_feat) to get bounding box predictions (bbox_pred).
-        e. Apply the objectness predictor convolution (conv_obj) on the regression feature map (reg_feat) to get objectness scores (objectness).
-    2. Collect the classification scores, bounding box predictions, and objectness scores for each scale level and store them in a tuple.
-    3. Return the tuple as the final output.
-
     """
-
+    
     BBOX_DIM = 4
     OBJECTNESS_DIM = 1
 
@@ -637,6 +578,7 @@ class YOLOXHead(nn.Module):
                 ):
 
         super().__init__()
+        # Store various configurations as instance variables
         self.num_classes = num_classes
         self.cls_out_channels = num_classes
         self.in_channels = in_channels
@@ -645,7 +587,9 @@ class YOLOXHead(nn.Module):
         self.strides = strides
         self.momentum = momentum
         self.eps = eps
-        self._init_layers()  # initialize layers
+        
+        # Initialize the layers of the model
+        self._init_layers()
 
     def _init_layers(self):
         """
@@ -653,11 +597,14 @@ class YOLOXHead(nn.Module):
         convolutions, regression convolutions and prediction convolutions 
         for each scale level.
         """
+        # Initialize multi-level lists for each type of layer
         self.multi_level_cls_convs = nn.ModuleList()
         self.multi_level_reg_convs = nn.ModuleList()
         self.multi_level_conv_cls = nn.ModuleList()
         self.multi_level_conv_reg = nn.ModuleList()
         self.multi_level_conv_obj = nn.ModuleList()
+        
+        # For each stride level, create layers and add them to their respective lists
         for _ in self.strides:
             self.multi_level_cls_convs.append(self._build_stacked_convs())
             self.multi_level_reg_convs.append(self._build_stacked_convs())
@@ -669,14 +616,10 @@ class YOLOXHead(nn.Module):
     def _build_stacked_convs(self):
         """
         Build stacked convolution layers.
-
-        Returns
-        -------
-        nn.Sequential
-            A sequential container of stacked conv layers.
         """
         conv = ConvModule
         stacked_convs = []
+        # Create a series of convolution layers
         for i in range(self.stacked_convs):
             chn = self.in_channels if i == 0 else self.feat_channels
             stacked_convs.append(
@@ -691,50 +634,28 @@ class YOLOXHead(nn.Module):
                     affine=True, 
                     track_running_stats=True,
                     bias=False))
+        # Return the layers as a sequential model
         return nn.Sequential(*stacked_convs)
 
     def _build_predictor(self):
         """
         Build predictor layers for classification, regression, and objectness.
-
-        Returns
-        -------
-        tuple
-            The classification, regression, and objectness convolutional layers.
         """
+        # Create convolution layers for each type of prediction
         conv_cls = nn.Conv2d(self.feat_channels, self.cls_out_channels, 1)
         conv_reg = nn.Conv2d(self.feat_channels, self.BBOX_DIM, 1)
         conv_obj = nn.Conv2d(self.feat_channels, self.OBJECTNESS_DIM, 1)
         return conv_cls, conv_reg, conv_obj
 
-    def forward_single(self, x, cls_convs, reg_convs, conv_cls, conv_reg,
-                       conv_obj):
+    def forward_single(self, x, cls_convs, reg_convs, conv_cls, conv_reg, conv_obj):
         """
         Forward feature of a single scale level.
-
-        Parameters
-        ----------
-        x : tensor
-            The input tensor.
-        cls_convs : nn.Module
-            The classification convolutions.
-        reg_convs : nn.Module
-            The regression convolutions.
-        conv_cls : nn.Module
-            The classification predictor convolution.
-        conv_reg : nn.Module
-            The regression predictor convolution.
-        conv_obj : nn.Module
-            The objectness predictor convolution.
-
-        Returns
-        -------
-        tuple
-            The classification scores, bounding box predictions, and objectness.
         """
+        # Pass input through classification and regression convolutions
         cls_feat = cls_convs(x)
         reg_feat = reg_convs(x)
 
+        # Apply predictors to get scores and predictions
         cls_score = conv_cls(cls_feat)
         bbox_pred = conv_reg(reg_feat)
         objectness = conv_obj(reg_feat)
@@ -744,17 +665,8 @@ class YOLOXHead(nn.Module):
     def forward(self, feats):
         """
         Forward pass for the head.
-
-        Parameters
-        ----------
-        feats : list
-            A list of multi-level features.
-
-        Returns
-        -------
-        tuple
-            The results of applying the forward_single function to each scale level.
         """
+        # Apply the forward_single function to each scale level
         return multi_apply(self.forward_single, feats,
                            self.multi_level_cls_convs,
                            self.multi_level_reg_convs,
@@ -802,21 +714,6 @@ class YOLOX(nn.Module):
         return x
 
 # %% ../nbs/00_model.ipynb 39
-def kaiming_init(module:torch.nn.Module # The module to be initialized.
-                ) -> None:
-    """
-    Initializes the weights of the Conv2d layers of the given model using the [Kaiming Normal initialization](https://pytorch.org/docs/stable/nn.init.html#torch.nn.init.kaiming_normal_).
-    """
-    
-    # If the module is a 2d convolutional layer
-    if isinstance(module, nn.Conv2d):
-        
-        # Apply Kaiming Normal initialization to the weights of the module
-        # We use 'fan_out' mode as this preserves the magnitude of the variance of the weights
-        # in the forward pass. The nonlinearity is set to 'relu' as the network uses ReLU activation functions.
-        init.kaiming_normal_(module.weight.data, mode='fan_out', nonlinearity='relu')
-
-# %% ../nbs/00_model.ipynb 43
 def init_head(head: YOLOXHead, # The YOLOX head to be initialized.
               num_classes: int # The number of classes in the dataset.
              ) -> None:
@@ -838,17 +735,15 @@ def init_head(head: YOLOXHead, # The YOLOX head to be initialized.
     conv_layers = [nn.Conv2d(head.feat_channels, head.cls_out_channels, 1) for _ in head.strides]
     
     for conv in conv_layers:
+        # Use Kaiming initialization to initialize the weights of the convolutional layers. 
         init.kaiming_normal_(conv.weight.data, mode='fan_out', nonlinearity='relu')
     
     head.multi_level_conv_cls = nn.ModuleList(conv_layers)
-    
-    # Use Kaiming initialization to initialize the weights of the convolutional layers. 
-    head.multi_level_conv_cls.apply(kaiming_init)
 
-# %% ../nbs/00_model.ipynb 47
+# %% ../nbs/00_model.ipynb 43
 from cjm_psl_utils.core import download_file
 
-# %% ../nbs/00_model.ipynb 48
+# %% ../nbs/00_model.ipynb 44
 def build_model(model_type:str, # Type of the model to be built.
                 num_classes:int, # Number of classes for the model.
                 pretrained:bool=True, # Whether to load pretrained weights.
