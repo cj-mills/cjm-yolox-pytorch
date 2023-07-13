@@ -19,7 +19,7 @@ import torchvision
 from .utils import multi_apply, generate_grid_priors
 from .simota import AssignResult, SimOTAAssigner
 
-# %% ../nbs/02_loss.ipynb 8
+# %% ../nbs/02_loss.ipynb 7
 @dataclass
 class SamplingResult:
     """
@@ -62,7 +62,7 @@ class SamplingResult:
         else:
             self.positive_ground_truth_labels = None
 
-# %% ../nbs/02_loss.ipynb 10
+# %% ../nbs/02_loss.ipynb 9
 class YOLOXLoss:
     """
     YOLOXLoss class implements the loss function used in the YOLOX model. 
