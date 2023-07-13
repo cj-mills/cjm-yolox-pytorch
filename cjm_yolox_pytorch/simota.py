@@ -265,6 +265,8 @@ class SimOTAAssigner():
 
         # Check if priors are in both ground truth boxes and centers
         is_in_boxes_and_centers = is_in_gts_all & is_in_cts_all
+        
+        print("Shape of is_in_boxes_and_centers: ", is_in_boxes_and_centers.shape)
 
         return is_in_gts_or_centers, is_in_boxes_and_centers
 
