@@ -65,24 +65,22 @@ class SamplingResult:
 # %% ../nbs/02_loss.ipynb 9
 class YOLOXLoss:
     """
-    YOLOXLoss class implements the loss function used in the YOLOX model. 
+    The callable YOLOXLoss class implements the loss function for training a YOLOX model.
+    
+    A YOLOXLoss instance takes the, class scores, predicted bounding boxes, objectness scores, ground truth bounding boxes, and ground truth labels. It then goes through the following steps:
+
+    1. Generate prior box coordinates for all anchors.
+    2. Flatten and concatenate class predictions, bounding box predictions, and objectness scores.
+    3. Decode box predictions.
+    4. Compute targets for each image in the batch.
+    5. Concatenate all positive masks, class targets, objectness targets, and bounding box targets.
+    6. Compute the bounding box loss, objectness loss, and classification loss, scale them by their respective weights, and normalize them by the total number of samples.
+    7. If using L1 loss, concatenate L1 targets, computes the L1 loss, scale it by its weight, and normalize it by the total number of samples.
+    8. Return a dictionary containing the computed losses.
     
     Based on OpenMMLab's implementation in the mmdetection library:
     
     - [OpenMMLab's Implementation](https://github.com/open-mmlab/mmdetection/blob/d64e719172335fa3d7a757a2a3636bd19e9efb62/mmdet/models/dense_heads/yolox_head.py#L321)
-
-    #### Pseudocode
-    1. Generate the grid of prior boxes by calling the `generate_grid_priors` function with arguments based on the shape of class scores and strides.
-    2. Update the centroids of the prior boxes based on their widths and heights.
-    3. Flatten the predicted class scores, bounding box predictions, and objectness scores across all scales and concatenate them. This is done by calling the `flatten_and_concat` method for each of these predictions.
-    4. Decode the predicted bounding boxes by calling the `bbox_decode` method, which calculates the actual coordinates of the predicted boxes based on the prior boxes and the predicted bounding box transformations.
-    5. For each image in the batch, compute the targets for classification, bounding box regression, objectness, and optionally, L1 regression. This is done by calling the `get_target_single` method, which matches prior boxes to ground truth boxes, samples positive and negative boxes, and then computes the targets. 
-    6. Concatenate all the computed targets across all images.
-    7. Compute the bounding box, objectness, and class losses by comparing the predictions with the targets. 
-    8. Calculate the total number of positive samples across all images in the batch.
-    9. Scale the computed losses using their respective weights and the total number of samples.
-    10. Create a dictionary to store the computed losses.
-    11. If use_l1 is True, concatenate l1 targets, compute L1 loss and add it to the loss dictionary.
         
     """
     def __init__(self, 
@@ -260,17 +258,16 @@ class YOLOXLoss:
         return (foreground_mask, class_targets, objectness_targets, bbox_targets, l1_targets, num_positive_per_image)
     
     
-    def flatten_and_concat(self, tensors, num_images, reshape_dims=None):
-        new_shape = (num_images, -1, reshape_dims) if reshape_dims else (num_images, -1)
+    def flatten_and_concat(self, tensors, batch_size, reshape_dims=None):
+        new_shape = (batch_size, -1, reshape_dims) if reshape_dims else (batch_size, -1)
         return torch.cat([t.permute(0, 2, 3, 1).reshape(*new_shape) for t in tensors], dim=1)
 
     
-    def __call__(self, num_images, class_scores, predicted_bboxes, objectness_scores, ground_truth_bboxes, ground_truth_labels):
+    def __call__(self, class_scores, predicted_bboxes, objectness_scores, ground_truth_bboxes, ground_truth_labels):
         """
         Main method to compute the YOLOX loss.
 
         Args:
-            num_images (int): The number of images in a batch.
             class_scores (List[torch.Tensor]): A list of class scores for each scale.
             predicted_bboxes (List[torch.Tensor]): A list of predicted bounding boxes for each scale.
             objectness_scores (List[torch.Tensor]): A list of objectness scores for each scale.
@@ -281,15 +278,18 @@ class YOLOXLoss:
             Dict: A dictionary with the classification, bounding box, objectness, and optionally, L1 loss.
         """
         
+        # Get the number of images in the batch
+        batch_size = class_scores[0].shape[0]
+        
         # Generate prior box coordinates for all anchors.
         grid_priors = generate_grid_priors(*[s*self.strides[0] for s in class_scores[0].shape[-2:]], self.strides)
         grid_priors[:, :2] *= grid_priors[:, 2].unsqueeze(1)
         flatten_prior_boxes = torch.cat([grid_priors, grid_priors[:, 2:].clone()], dim=1)
         
         # Flatten and concatenate class predictions, bounding box predictions, and objectness scores
-        flatten_class_preds = self.flatten_and_concat(class_scores, num_images, self.num_classes)
-        flatten_bbox_preds = self.flatten_and_concat(predicted_bboxes, num_images, 4)
-        flatten_objectness_scores = self.flatten_and_concat(objectness_scores, num_images)
+        flatten_class_preds = self.flatten_and_concat(class_scores, batch_size, self.num_classes)
+        flatten_bbox_preds = self.flatten_and_concat(predicted_bboxes, batch_size, 4)
+        flatten_objectness_scores = self.flatten_and_concat(objectness_scores, batch_size)
                     
         # Concatenate and decode box predictions
         flatten_prior_boxes = flatten_prior_boxes.to(flatten_bbox_preds.device)
@@ -300,7 +300,7 @@ class YOLOXLoss:
          num_positive_images) = multi_apply(
              self.get_target_single, flatten_class_preds.detach(),
              flatten_objectness_scores.detach(),
-             flatten_prior_boxes.unsqueeze(0).repeat(num_images, 1, 1),
+             flatten_prior_boxes.unsqueeze(0).repeat(batch_size, 1, 1),
              flatten_decoded_bboxes.detach(), ground_truth_bboxes, ground_truth_labels)
 
         # Concatenate all positive masks, class targets, objectness targets, and bounding box targets
