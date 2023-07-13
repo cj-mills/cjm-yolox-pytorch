@@ -16,7 +16,7 @@ import torch.nn.functional as F
 import torchvision
 
 # %% ../nbs/02_loss.ipynb 5
-from .utils import multi_apply, generate_grid_priors
+from .utils import multi_apply, generate_output_grids
 from .simota import AssignResult, SimOTAAssigner
 
 # %% ../nbs/02_loss.ipynb 7
@@ -29,12 +29,12 @@ class SamplingResult:
     
     - [OpenMMLab's Implementation](https://github.com/open-mmlab/mmdetection/blob/d64e719172335fa3d7a757a2a3636bd19e9efb62/mmdet/core/bbox/samplers/sampling_result.py#L7)
     """
-    positive_indices: np.array # Indices of the positive samples.
-    negative_indices: np.array # Indices of the negative samples.
-    bboxes: np.array # Array containing all bounding boxes.
+    positive_indices: np.ndarray # Indices of the positive samples.
+    negative_indices: np.ndarray # Indices of the negative samples.
+    bboxes: np.ndarray # Array containing all bounding boxes.
     ground_truth_bboxes: torch.Tensor # Tensor containing all ground truth bounding boxes.
     assignment_result: AssignResult # Object that contains the ground truth indices and labels corresponding to each sample.
-    ground_truth_flags: np.array # Array indicating which samples are ground truth.
+    ground_truth_flags: np.ndarray # Array indicating which samples are ground truth.
 
     def __post_init__(self):
         # Indices of positive and negative samples
@@ -69,7 +69,7 @@ class YOLOXLoss:
     
     A YOLOXLoss instance takes the, class scores, predicted bounding boxes, objectness scores, ground truth bounding boxes, and ground truth labels. It then goes through the following steps:
 
-    1. Generate prior box coordinates for all anchors.
+    1. Generate box coordinates for the output grids based on the input dimensions and stride values.
     2. Flatten and concatenate class predictions, bounding box predictions, and objectness scores.
     3. Decode box predictions.
     4. Compute targets for each image in the batch.
@@ -114,20 +114,20 @@ class YOLOXLoss:
         self.strides = strides
         
         
-    def bbox_decode(self, prior_boxes, predicted_boxes):
+    def bbox_decode(self, output_grid_boxes, predicted_boxes):
         """
         Decodes the predicted bounding boxes based on the prior boxes.
 
         Args:
-            prior_boxes (torch.Tensor): The prior bounding boxes.
+            output_grid_boxes (torch.Tensor): The output grid boxes.
             predicted_boxes (torch.Tensor): The predicted bounding boxes.
 
         Returns:
             torch.Tensor: The decoded bounding boxes.
         """
         # Calculate box centroids (geometric centers) and sizes
-        box_centroids = (predicted_boxes[..., :2] * prior_boxes[:, 2:]) + prior_boxes[:, :2]
-        box_sizes = torch.exp(predicted_boxes[..., 2:]) * prior_boxes[:, 2:]
+        box_centroids = (predicted_boxes[..., :2] * output_grid_boxes[:, 2:]) + output_grid_boxes[:, :2]
+        box_sizes = torch.exp(predicted_boxes[..., 2:]) * output_grid_boxes[:, 2:]
 
         # Calculate corners of bounding boxes
         top_left = box_centroids - box_sizes / 2
@@ -161,26 +161,26 @@ class YOLOXLoss:
         return sampling_result
 
 
-    def get_l1_target(self, l1_target, ground_truth_boxes, prior_boxes, epsilon=1e-8):
+    def get_l1_target(self, l1_target, ground_truth_boxes, output_grid_boxes, epsilon=1e-8):
         """
         Calculates the L1 target.
 
         Args:
             l1_target (torch.Tensor): The L1 target tensor.
             ground_truth_boxes (torch.Tensor): The ground truth boxes.
-            prior_boxes (torch.Tensor): The prior bounding boxes.
+            output_grid_boxes (torch.Tensor): The output grid boxes.
             epsilon (float, optional): A small value to prevent division by zero. Defaults to 1e-8.
 
         Returns:
             torch.Tensor: The updated L1 target.
         """
         ground_truth_centroid_and_wh = torchvision.ops.box_convert(ground_truth_boxes, 'xyxy', 'cxcywh')
-        l1_target[:, :2] = (ground_truth_centroid_and_wh[:, :2] - prior_boxes[:, :2]) / prior_boxes[:, 2:]
-        l1_target[:, 2:] = torch.log(ground_truth_centroid_and_wh[:, 2:] / prior_boxes[:, 2:] + epsilon)
+        l1_target[:, :2] = (ground_truth_centroid_and_wh[:, :2] - output_grid_boxes[:, :2]) / output_grid_boxes[:, 2:]
+        l1_target[:, 2:] = torch.log(ground_truth_centroid_and_wh[:, 2:] / output_grid_boxes[:, 2:] + epsilon)
         return l1_target
 
 
-    def get_target_single(self, class_preds, objectness_score, prior_boxes, decoded_bboxes,
+    def get_target_single(self, class_preds, objectness_score, output_grid_boxes, decoded_bboxes,
                            ground_truth_bboxes, ground_truth_labels):
         """
         Calculates the targets for a single image.
@@ -188,7 +188,7 @@ class YOLOXLoss:
         Args:
             class_preds (torch.Tensor): The predicted class probabilities.
             objectness_score (torch.Tensor): The predicted objectness scores.
-            prior_boxes (torch.Tensor): The prior bounding boxes.
+            output_grid_boxes (torch.Tensor): The output grid boxes.
             decoded_bboxes (torch.Tensor): The decoded bounding boxes.
             ground_truth_bboxes (torch.Tensor): The ground truth boxes.
             ground_truth_labels (torch.Tensor): The ground truth labels.
@@ -198,7 +198,7 @@ class YOLOXLoss:
             the foreground mask and the number of positive samples.
         """
         # Get the number of prior boxes and ground truth labels
-        num_prior_boxes = prior_boxes.size(0)
+        num_output_grid_boxes = output_grid_boxes.size(0)
         num_ground_truths = ground_truth_labels.size(0)
 
         # Match dtype of ground truth bounding boxes to the dtype of decoded bounding boxes
@@ -210,21 +210,21 @@ class YOLOXLoss:
             class_targets = class_preds.new_zeros((0, self.num_classes))
             bbox_targets = class_preds.new_zeros((0, 4))
             l1_targets = class_preds.new_zeros((0, 4))
-            objectness_targets = class_preds.new_zeros((num_prior_boxes, 1))
-            foreground_mask = class_preds.new_zeros(num_prior_boxes).bool()
+            objectness_targets = class_preds.new_zeros((num_output_grid_boxes, 1))
+            foreground_mask = class_preds.new_zeros(num_output_grid_boxes).bool()
             return (foreground_mask, class_targets, objectness_targets, bbox_targets,
                     l1_targets, 0)  # Return zero for num_positive_per_image
 
         # Calculate the offset for the prior boxes
-        offset_prior_boxes = torch.cat([prior_boxes[:, :2] + prior_boxes[:, 2:] * 0.5, prior_boxes[:, 2:]], dim=-1)
+        offset_output_grid_boxes = torch.cat([output_grid_boxes[:, :2] + output_grid_boxes[:, 2:] * 0.5, output_grid_boxes[:, 2:]], dim=-1)
 
         # Assign ground truth objects to prior boxes and get assignment results
         assignment_result = self.assigner.assign(
             class_preds.sigmoid() * objectness_score.unsqueeze(1).sigmoid(),
-            offset_prior_boxes, decoded_bboxes, ground_truth_bboxes, ground_truth_labels)
+            offset_output_grid_boxes, decoded_bboxes, ground_truth_bboxes, ground_truth_labels)
 
         # Use assignment results to sample prior boxes
-        sampling_result = self.sample(assignment_result, prior_boxes, ground_truth_bboxes)
+        sampling_result = self.sample(assignment_result, output_grid_boxes, ground_truth_bboxes)
         
         # Get the indices of positive (object-containing) samples
         positive_indices = sampling_result.positive_indices
@@ -248,7 +248,7 @@ class YOLOXLoss:
 
         # If use_l1 is True, calculate L1 targets
         if self.use_l1:
-            l1_targets = self.get_l1_target(l1_targets, bbox_targets, prior_boxes[positive_indices])
+            l1_targets = self.get_l1_target(l1_targets, bbox_targets, output_grid_boxes[positive_indices])
 
         # Initialize foreground_mask as zeros and set the values at positive_indices to True
         foreground_mask = torch.zeros_like(objectness_score).to(torch.bool)
@@ -281,10 +281,10 @@ class YOLOXLoss:
         # Get the number of images in the batch
         batch_size = class_scores[0].shape[0]
         
-        # Generate prior box coordinates for all anchors.
-        grid_priors = generate_grid_priors(*[s*self.strides[0] for s in class_scores[0].shape[-2:]], self.strides)
-        grid_priors[:, :2] *= grid_priors[:, 2].unsqueeze(1)
-        flatten_prior_boxes = torch.cat([grid_priors, grid_priors[:, 2:].clone()], dim=1)
+        # Generate box coordinates for all grid priors.
+        output_grid_boxes = generate_output_grid_boxes(*[s*self.strides[0] for s in class_scores[0].shape[-2:]], self.strides)
+        output_grid_boxes[:, :2] *= output_grid_boxes[:, 2].unsqueeze(1)
+        flatten_output_grid_boxes = torch.cat([output_grid_boxes, output_grid_boxes[:, 2:].clone()], dim=1)
         
         # Flatten and concatenate class predictions, bounding box predictions, and objectness scores
         flatten_class_preds = self.flatten_and_concat(class_scores, batch_size, self.num_classes)
@@ -292,15 +292,15 @@ class YOLOXLoss:
         flatten_objectness_scores = self.flatten_and_concat(objectness_scores, batch_size)
                     
         # Concatenate and decode box predictions
-        flatten_prior_boxes = flatten_prior_boxes.to(flatten_bbox_preds.device)
-        flatten_decoded_bboxes = self.bbox_decode(flatten_prior_boxes, flatten_bbox_preds)
+        flatten_output_grid_boxes = flatten_output_grid_boxes.to(flatten_bbox_preds.device)
+        flatten_decoded_bboxes = self.bbox_decode(flatten_output_grid_boxes, flatten_bbox_preds)
 
         # Compute targets
         (positive_masks, class_targets, objectness_targets, bbox_targets, l1_targets,
          num_positive_images) = multi_apply(
              self.get_target_single, flatten_class_preds.detach(),
              flatten_objectness_scores.detach(),
-             flatten_prior_boxes.unsqueeze(0).repeat(batch_size, 1, 1),
+             flatten_output_grid_boxes.unsqueeze(0).repeat(batch_size, 1, 1),
              flatten_decoded_bboxes.detach(), ground_truth_bboxes, ground_truth_labels)
 
         # Concatenate all positive masks, class targets, objectness targets, and bounding box targets
