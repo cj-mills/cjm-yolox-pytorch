@@ -396,14 +396,34 @@ class YOLOXLoss:
                 l1_targets.append(result[4])
                 num_positive_images.append(result[5])
         
-        
+        # Check if lists are empty and replace with empty tensors if they are
+        if len(positive_masks) == 0:
+            positive_masks = torch.empty((0,), dtype=torch.bool, device=class_scores[0].device)
+        else:
+            positive_masks = torch.cat(positive_masks, 0)
+
+        if len(class_targets) == 0:
+            class_targets = torch.empty((0,), dtype=torch.long, device=class_scores[0].device)
+        else:
+            class_targets = torch.cat(class_targets, 0)
+
+        if len(objectness_targets) == 0:
+            objectness_targets = torch.empty((0, 1), dtype=torch.float32, device=class_scores[0].device)
+        else:
+            objectness_targets = torch.cat(objectness_targets, 0)
+
+        if len(bbox_targets) == 0:
+            bbox_targets = torch.empty((0, 4), dtype=torch.float32, device=class_scores[0].device)
+        else:
+            bbox_targets = torch.cat(bbox_targets, 0)
+
         # ---------------------------
 
-        # Concatenate all positive masks, class targets, objectness targets, and bounding box targets
-        positive_masks = torch.cat(positive_masks, 0)
-        class_targets = torch.cat(class_targets, 0)
-        objectness_targets = torch.cat(objectness_targets, 0)
-        bbox_targets = torch.cat(bbox_targets, 0)
+#         # Concatenate all positive masks, class targets, objectness targets, and bounding box targets
+#         positive_masks = torch.cat(positive_masks, 0)
+#         class_targets = torch.cat(class_targets, 0)
+#         objectness_targets = torch.cat(objectness_targets, 0)
+#         bbox_targets = torch.cat(bbox_targets, 0)
 
         # Compute bounding box loss
         loss_bbox = self.bbox_loss_func(flatten_decoded_bboxes.view(-1, 4)[positive_masks], bbox_targets)
