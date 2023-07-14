@@ -416,35 +416,6 @@ class YOLOXLoss:
             bbox_targets = torch.empty((0, 4), dtype=torch.float32, device=class_scores[0].device)
         else:
             bbox_targets = torch.cat(bbox_targets, 0)
-            
-            
-        # Compute bounding box loss
-        if positive_masks.shape[0] > 0:
-            loss_bbox = self.bbox_loss_func(flatten_decoded_bboxes.view(-1, 4)[positive_masks], bbox_targets)
-        else:
-            loss_bbox = torch.tensor(0.).to(class_scores[0].device)
-
-        # Compute objectness loss
-        loss_obj = self.objectness_loss_func(flatten_objectness_scores.view(-1, 1), objectness_targets)
-
-        # Compute class loss
-        if positive_masks.shape[0] > 0:
-            loss_cls = self.class_loss_func(flatten_class_preds.view(-1, self.num_classes)[positive_masks], class_targets)
-        else:
-            loss_cls = torch.tensor(0.).to(class_scores[0].device)
-
-        # For L1 loss, do the same
-        if self.use_l1:
-            if positive_masks.shape[0] > 0:
-                l1_targets = torch.cat(l1_targets, 0)
-                loss_l1 = self.l1_loss_func(
-                    flatten_bbox_preds.view(-1, 4)[positive_masks],
-                    l1_targets) / num_total_samples
-                loss_l1 *= self.l1_loss_weight
-                loss_dict.update(loss_l1=loss_l1)
-            else:
-                loss_dict.update(loss_l1=torch.tensor(0.).to(class_scores[0].device))
-
 
         # ---------------------------
 
@@ -462,17 +433,32 @@ class YOLOXLoss:
 
 #         # Compute class loss
 #         loss_cls = self.class_loss_func(flatten_class_preds.view(-1, self.num_classes)[positive_masks],class_targets)
+
+        # Compute bounding box loss
+        if positive_masks.shape[0] > 0:
+            loss_bbox = self.bbox_loss_func(flatten_decoded_bboxes.view(-1, 4)[positive_masks], bbox_targets)
+        else:
+            loss_bbox = torch.tensor(0.).to(class_scores[0].device)
+
+        # Compute objectness loss
+        loss_obj = self.objectness_loss_func(flatten_objectness_scores.view(-1, 1), objectness_targets)
+
+        # Compute class loss
+        if positive_masks.shape[0] > 0:
+            loss_cls = self.class_loss_func(flatten_class_preds.view(-1, self.num_classes)[positive_masks], class_targets)
+        else:
+            loss_cls = torch.tensor(0.).to(class_scores[0].device)
         
-#         # Calculate total number of samples
-#         num_total_samples = max(sum(num_positive_images), 1)
+        # Calculate total number of samples
+        num_total_samples = max(sum(num_positive_images), 1)
         
-#         # Scale losses
-#         loss_bbox = (loss_bbox * self.bbox_loss_weight) / num_total_samples
-#         loss_obj = (loss_obj * self.objectness_loss_weight) / num_total_samples
-#         loss_cls = (loss_cls * self.class_loss_weight) / num_total_samples
+        # Scale losses
+        loss_bbox = (loss_bbox * self.bbox_loss_weight) / num_total_samples
+        loss_obj = (loss_obj * self.objectness_loss_weight) / num_total_samples
+        loss_cls = (loss_cls * self.class_loss_weight) / num_total_samples
         
-#         # Initialize loss dictionary
-#         loss_dict = dict(loss_cls=loss_cls, loss_bbox=loss_bbox, loss_obj=loss_obj)
+        # Initialize loss dictionary
+        loss_dict = dict(loss_cls=loss_cls, loss_bbox=loss_bbox, loss_obj=loss_obj)
 
 #         # If use_l1 is True, concatenate l1 targets, compute L1 loss and add it to the loss dictionary
 #         if self.use_l1:
@@ -482,6 +468,18 @@ class YOLOXLoss:
 #                 l1_targets) / num_total_samples
 #             loss_l1 *= self.l1_loss_weight
 #             loss_dict.update(loss_l1=loss_l1)
+
+        # For L1 loss, do the same
+        if self.use_l1:
+            if positive_masks.shape[0] > 0:
+                l1_targets = torch.cat(l1_targets, 0)
+                loss_l1 = self.l1_loss_func(
+                    flatten_bbox_preds.view(-1, 4)[positive_masks],
+                    l1_targets) / num_total_samples
+                loss_l1 *= self.l1_loss_weight
+                loss_dict.update(loss_l1=loss_l1)
+            else:
+                loss_dict.update(loss_l1=torch.tensor(0.).to(class_scores[0].device))
 
         # Return loss dictionary
         return loss_dict
