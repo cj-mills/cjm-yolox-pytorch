@@ -438,7 +438,7 @@ class YOLOXLoss:
         if positive_masks.shape[0] > 0:
             loss_bbox = self.bbox_loss_func(flatten_decoded_bboxes.view(-1, 4)[positive_masks], bbox_targets)
         else:
-            loss_bbox = torch.tensor(0.).to(class_scores[0].device)
+            loss_bbox = torch.tensor(0.)#.to(class_scores[0].device)
 
         # Compute objectness loss
         loss_obj = self.objectness_loss_func(flatten_objectness_scores.view(-1, 1), objectness_targets)
@@ -447,7 +447,7 @@ class YOLOXLoss:
         if positive_masks.shape[0] > 0:
             loss_cls = self.class_loss_func(flatten_class_preds.view(-1, self.num_classes)[positive_masks], class_targets)
         else:
-            loss_cls = torch.tensor(0.).to(class_scores[0].device)
+            loss_cls = torch.tensor(0.)#.to(class_scores[0].device)
         
         # Calculate total number of samples
         num_total_samples = max(sum(num_positive_images), 1)
