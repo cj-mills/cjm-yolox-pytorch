@@ -113,20 +113,24 @@ class SimOTAAssigner():
         HIGH_COST_VALUE = 100000000
         num_gt = gt_bboxes.size(0)
         num_bboxes = decoded_bboxes.size(0)
-
-        # assign 0 by default
-        assigned_gt_inds = decoded_bboxes.new_full((num_bboxes, ), 0, dtype=torch.long)
-        if num_gt == 0 or num_bboxes == 0:
-            # No ground truth or boxes, return empty assignment
-            max_overlaps = decoded_bboxes.new_zeros((num_bboxes, ))
-            if num_gt == 0:
-                # No truth, assign everything to background
-                assigned_gt_inds[:] = 0
-            if gt_labels is None:
-                assigned_labels = None
-            else:
-                assigned_labels = decoded_bboxes.new_full((num_bboxes, ), -1, dtype=torch.long)
-            return AssignResult(num_gt, assigned_gt_inds, max_overlaps, category_labels=assigned_labels)
+        
+        try:
+            # assign 0 by default
+            assigned_gt_inds = decoded_bboxes.new_full((num_bboxes, ), 0, dtype=torch.long)
+            if num_gt == 0 or num_bboxes == 0:
+                # No ground truth or boxes, return empty assignment
+                max_overlaps = decoded_bboxes.new_zeros((num_bboxes, ))
+                if num_gt == 0:
+                    # No truth, assign everything to background
+                    assigned_gt_inds[:] = 0
+                if gt_labels is None:
+                    assigned_labels = None
+                else:
+                    assigned_labels = decoded_bboxes.new_full((num_bboxes, ), -1, dtype=torch.long)
+                return AssignResult(num_gt, assigned_gt_inds, max_overlaps, category_labels=assigned_labels)
+        except:
+            print("An error occurred with creating AssignResult`\n: ", str(e))
+        
         
         try:
             # Get info whether a output_grid_box is in gt bounding box and also the center of gt bounding box
