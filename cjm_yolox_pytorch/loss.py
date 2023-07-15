@@ -219,13 +219,17 @@ class YOLOXLoss:
         offset_output_grid_boxes = torch.cat([output_grid_boxes[:, :2] + output_grid_boxes[:, 2:] * 0.5, output_grid_boxes[:, 2:]], dim=-1)
 
         
-        try:
-            # Assign ground truth objects to prior boxes and get assignment results
-            assignment_result = self.assigner.assign(
-                class_preds.sigmoid() * objectness_score.unsqueeze(1).sigmoid(),
-                offset_output_grid_boxes, decoded_bboxes, ground_truth_bboxes, ground_truth_labels)
-        except Exception as e:
-            print("An error occurred with `self.assigner.assign()`\n: ", str(e))
+        # Assign ground truth objects to prior boxes and get assignment results
+        assignment_result = self.assigner.assign(
+            class_preds.sigmoid() * objectness_score.unsqueeze(1).sigmoid(),
+            offset_output_grid_boxes, decoded_bboxes, ground_truth_bboxes, ground_truth_labels)
+#         try:
+#             # Assign ground truth objects to prior boxes and get assignment results
+#             assignment_result = self.assigner.assign(
+#                 class_preds.sigmoid() * objectness_score.unsqueeze(1).sigmoid(),
+#                 offset_output_grid_boxes, decoded_bboxes, ground_truth_bboxes, ground_truth_labels)
+#         except Exception as e:
+#             print("An error occurred with `self.assigner.assign()`\n: ", str(e))
 
         
         try:
@@ -397,12 +401,12 @@ class YOLOXLoss:
              flatten_output_grid_boxes.unsqueeze(0).repeat(batch_size, 1, 1),
              flatten_decoded_bboxes.detach(), ground_truth_bboxes, ground_truth_labels)
         
-        flatten_class_preds.to(src_device)
-        flatten_objectness_scores.to(src_device)
-        flatten_output_grid_boxes.to(src_device)
-        flatten_decoded_bboxes.to(src_device)
-        ground_truth_labels = [gt_label.to(src_device) for gt_label in ground_truth_labels]
-        ground_truth_bboxes = [gt_bbox.to(src_device) for gt_bbox in ground_truth_bboxes]
+#         flatten_class_preds.to(src_device)
+#         flatten_objectness_scores.to(src_device)
+#         flatten_output_grid_boxes.to(src_device)
+#         flatten_decoded_bboxes.to(src_device)
+#         ground_truth_labels = [gt_label.to(src_device) for gt_label in ground_truth_labels]
+#         ground_truth_bboxes = [gt_bbox.to(src_device) for gt_bbox in ground_truth_bboxes]
         
 #         positive_masks
 #         class_targets
