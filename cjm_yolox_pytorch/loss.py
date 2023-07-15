@@ -408,7 +408,7 @@ class YOLOXLoss:
 #         class_targets
 #         objectness_targets
 #         bbox_targets
-#         l1_targets
+        l1_targets = l1_targets.to(src_device)
 #         num_positive_images
 
         # Concatenate all positive masks, class targets, objectness targets, and bounding box targets
