@@ -127,19 +127,30 @@ class SimOTAAssigner():
             else:
                 assigned_labels = decoded_bboxes.new_full((num_bboxes, ), -1, dtype=torch.long)
             return AssignResult(num_gt, assigned_gt_inds, max_overlaps, category_labels=assigned_labels)
-
-        # Get info whether a output_grid_box is in gt bounding box and also the center of gt bounding box
-        valid_mask, is_in_boxes_and_center = self.get_in_gt_and_in_center_info(output_grid_boxes, gt_bboxes)
+        
+        try:
+            # Get info whether a output_grid_box is in gt bounding box and also the center of gt bounding box
+            valid_mask, is_in_boxes_and_center = self.get_in_gt_and_in_center_info(output_grid_boxes, gt_bboxes)
+        except Exception as e:
+            print("An error occurred with `self.get_in_gt_and_in_center_info()`\n: ", str(e))
 
         # Extract valid bounding boxes and scores (i.e., those in ground truth boxes and centers)
         valid_decoded_bbox = decoded_bboxes[valid_mask]
         valid_pred_scores = pred_scores[valid_mask]
         num_valid = valid_decoded_bbox.size(0)
 
-        # Compute IoU between valid decoded bounding boxes and gt bounding boxes
-        pairwise_ious = torchvision.ops.generalized_box_iou(valid_decoded_bbox, gt_bboxes)
-        # Compute IoU cost
-        iou_cost = -torch.log(pairwise_ious + eps)
+        
+        try:
+            # Compute IoU between valid decoded bounding boxes and gt bounding boxes
+            pairwise_ious = torchvision.ops.generalized_box_iou(valid_decoded_bbox, gt_bboxes)
+        except:
+            print("An error occurred with `torchvision.ops.generalized_box_iou`\n: ", str(e))
+            
+        try:
+            # Compute IoU cost
+            iou_cost = -torch.log(pairwise_ious + eps)
+        except:
+            print("An error occurred with `torch.log`\n: ", str(e))
 
         # Convert gt_labels to one-hot format and calculate classification cost
         gt_onehot_label = F.one_hot(gt_labels.to(torch.int64), pred_scores.shape[-1]).float().unsqueeze(0).repeat(num_valid, 1, 1)
@@ -156,15 +167,22 @@ class SimOTAAssigner():
         # and assign a high cost (HIGH_COST_VALUE) for bboxes not in both boxes and centers
         cost_matrix = cls_cost * self.cls_weight + iou_cost * self.iou_weight + (~is_in_boxes_and_center) * HIGH_COST_VALUE
 
-        # Perform matching between ground truth and valid bounding boxes based on the cost matrix
-        matched_pred_ious, matched_gt_inds = self.dynamic_k_matching(cost_matrix, pairwise_ious, num_gt, valid_mask)
-
-        # Convert to AssignResult format: assign matched gt indices, labels and IoU scores
-        assigned_gt_inds[valid_mask] = matched_gt_inds + 1
-        assigned_labels = assigned_gt_inds.new_full((num_bboxes, ), -1)
-        assigned_labels[valid_mask] = gt_labels[matched_gt_inds].long()
-        max_overlaps = assigned_gt_inds.new_full((num_bboxes, ), -HIGH_COST_VALUE, dtype=torch.float32)
-        max_overlaps[valid_mask] = matched_pred_ious
+        try:
+            # Perform matching between ground truth and valid bounding boxes based on the cost matrix
+            matched_pred_ious, matched_gt_inds = self.dynamic_k_matching(cost_matrix, pairwise_ious, num_gt, valid_mask)
+        except:
+            print("An error occurred with `self.dynamic_k_matching()`\n: ", str(e))
+        
+        try:
+            # Convert to AssignResult format: assign matched gt indices, labels and IoU scores
+            assigned_gt_inds[valid_mask] = matched_gt_inds + 1
+            assigned_labels = assigned_gt_inds.new_full((num_bboxes, ), -1)
+            assigned_labels[valid_mask] = gt_labels[matched_gt_inds].long()
+            max_overlaps = assigned_gt_inds.new_full((num_bboxes, ), -HIGH_COST_VALUE, dtype=torch.float32)
+            max_overlaps[valid_mask] = matched_pred_ious
+        except:
+            print("An error occurred converting to AssignResult format`\n: ", str(e))
+            
         return AssignResult(num_gt, assigned_gt_inds, max_overlaps, category_labels=assigned_labels)
 
     def get_in_gt_and_in_center_info(self, output_grid_boxes, gt_bboxes):
