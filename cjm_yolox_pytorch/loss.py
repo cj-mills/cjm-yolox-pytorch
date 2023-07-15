@@ -220,11 +220,26 @@ class YOLOXLoss:
 
         
         try:
+            src_device = class_preds.device
             
+            class_preds.to('cpu')
+            objectness_score.to('cpu')
+            offset_output_grid_boxes.to('cpu')
+            decoded_bboxes.to('cpu')
+            ground_truth_bboxes.to('cpu')
+            ground_truth_labels.to('cpu')
             # Assign ground truth objects to prior boxes and get assignment results
             assignment_result = self.assigner.assign(
                 class_preds.sigmoid() * objectness_score.unsqueeze(1).sigmoid(),
                 offset_output_grid_boxes, decoded_bboxes, ground_truth_bboxes, ground_truth_labels)
+            
+            
+            class_preds.to(src_device)
+            objectness_score.to(src_device)
+            offset_output_grid_boxes.to(src_device)
+            decoded_bboxes.to(src_device)
+            ground_truth_bboxes.to(src_device)
+            ground_truth_labels.to(src_device)
         except Exception as e:
             print("An error occurred with `self.assigner.assign()`\n: ", str(e))
 
