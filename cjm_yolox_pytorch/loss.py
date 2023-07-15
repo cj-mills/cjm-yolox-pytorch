@@ -348,8 +348,7 @@ class YOLOXLoss:
 
 #         # Return loss dictionary
 #         return loss_dict
-    
-    
+
     def __call__(self, class_scores, predicted_bboxes, objectness_scores, ground_truth_bboxes, ground_truth_labels):
         """
         Main method to compute the YOLOX loss.
@@ -364,55 +363,56 @@ class YOLOXLoss:
         Returns:
             Dict: A dictionary with the classification, bounding box, objectness, and optionally, L1 loss.
         """
-
+        
         # Get the number of images in the batch
         batch_size = class_scores[0].shape[0]
-
+        
         # Generate box coordinates for all grid priors.
         output_grid_boxes = generate_output_grids(*[s*self.strides[0] for s in class_scores[0].shape[-2:]], self.strides)
         output_grid_boxes[:, :2] *= output_grid_boxes[:, 2].unsqueeze(1)
         flatten_output_grid_boxes = torch.cat([output_grid_boxes, output_grid_boxes[:, 2:].clone()], dim=1)
-
+        
         # Flatten and concatenate class predictions, bounding box predictions, and objectness scores
         flatten_class_preds = self.flatten_and_concat(class_scores, batch_size, self.num_classes)
         flatten_bbox_preds = self.flatten_and_concat(predicted_bboxes, batch_size, 4)
         flatten_objectness_scores = self.flatten_and_concat(objectness_scores, batch_size)
-
-        # Store original device
-        original_device = flatten_class_preds.device
-
-        # Move to CPU
-        flatten_class_preds = flatten_class_preds.to('cpu')
-        flatten_bbox_preds = flatten_bbox_preds.to('cpu')
-        flatten_objectness_scores = flatten_objectness_scores.to('cpu')
-        ground_truth_bboxes = [gt_bbox.to('cpu') for gt_bbox in ground_truth_bboxes]
-        ground_truth_labels = [gt_label.to('cpu') for gt_label in ground_truth_labels]
-
+                    
         # Concatenate and decode box predictions
         flatten_output_grid_boxes = flatten_output_grid_boxes.to(flatten_bbox_preds.device)
         flatten_decoded_bboxes = self.bbox_decode(flatten_output_grid_boxes, flatten_bbox_preds)
+        
+        src_device = flatten_bbox_preds.device
+        flatten_class_preds.to('cpu')
+        flatten_objectness_scores.to('cpu')
+        flatten_output_grid_boxes.to('cpu')
+        flatten_decoded_bboxes.to('cpu')
+        ground_truth_labels = [gt_label.to('cpu') for gt_label in ground_truth_labels]
+        ground_truth_bboxes = [gt_bbox.to('cpu') for gt_bbox in ground_truth_bboxes]
 
         # Compute targets
         (positive_masks, class_targets, objectness_targets, bbox_targets, l1_targets,
          num_positive_images) = multi_apply(
-            self.get_target_single, flatten_class_preds.detach(),
-            flatten_objectness_scores.detach(),
-            flatten_output_grid_boxes.unsqueeze(0).repeat(batch_size, 1, 1),
-            flatten_decoded_bboxes.detach(), ground_truth_bboxes, ground_truth_labels)
-
-        # Move inputs and outputs back to original device
-        flatten_class_preds = flatten_class_preds.to(original_device)
-        flatten_bbox_preds = flatten_bbox_preds.to(original_device)
-        flatten_objectness_scores = flatten_objectness_scores.to(original_device)
-        ground_truth_bboxes = [gt_bbox.to(original_device) for gt_bbox in ground_truth_bboxes]
-        ground_truth_labels = [gt_label.to(original_device) for gt_label in ground_truth_labels]
-        positive_masks = torch.cat([mask.to(original_device) for mask in positive_masks], 0)
-        class_targets = [target.to(original_device) for target in class_targets]
-        objectness_targets = [target.to(original_device) for target in objectness_targets]
-        bbox_targets = [target.to(original_device) for target in bbox_targets]
-        l1_targets = [target.to(original_device) for target in l1_targets]
+             self.get_target_single, flatten_class_preds.detach(),
+             flatten_objectness_scores.detach(),
+             flatten_output_grid_boxes.unsqueeze(0).repeat(batch_size, 1, 1),
+             flatten_decoded_bboxes.detach(), ground_truth_bboxes, ground_truth_labels)
+        
+        flatten_class_preds.to(src_device)
+        flatten_objectness_scores.to(src_device)
+        flatten_output_grid_boxes.to(src_device)
+        flatten_decoded_bboxes.to(src_device)
+        ground_truth_labels = [gt_label.to(src_device) for gt_label in ground_truth_labels]
+        ground_truth_bboxes = [gt_bbox.to(src_device) for gt_bbox in ground_truth_bboxes]
+        
+#         positive_masks
+#         class_targets
+#         objectness_targets
+#         bbox_targets
+#         l1_targets
+#         num_positive_images
 
         # Concatenate all positive masks, class targets, objectness targets, and bounding box targets
+        positive_masks = torch.cat(positive_masks, 0)
         class_targets = torch.cat(class_targets, 0)
         objectness_targets = torch.cat(objectness_targets, 0)
         bbox_targets = torch.cat(bbox_targets, 0)
@@ -425,15 +425,15 @@ class YOLOXLoss:
 
         # Compute class loss
         loss_cls = self.class_loss_func(flatten_class_preds.view(-1, self.num_classes)[positive_masks],class_targets)
-
+        
         # Calculate total number of samples
         num_total_samples = max(sum(num_positive_images), 1)
-
+        
         # Scale losses
         loss_bbox = (loss_bbox * self.bbox_loss_weight) / num_total_samples
         loss_obj = (loss_obj * self.objectness_loss_weight) / num_total_samples
         loss_cls = (loss_cls * self.class_loss_weight) / num_total_samples
-
+        
         # Initialize loss dictionary
         loss_dict = dict(loss_cls=loss_cls, loss_bbox=loss_bbox, loss_obj=loss_obj)
 
@@ -448,5 +448,3 @@ class YOLOXLoss:
 
         # Return loss dictionary
         return loss_dict
-
-
