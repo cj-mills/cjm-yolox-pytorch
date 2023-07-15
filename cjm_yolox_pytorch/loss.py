@@ -382,10 +382,10 @@ class YOLOXLoss:
         flatten_decoded_bboxes = self.bbox_decode(flatten_output_grid_boxes, flatten_bbox_preds)
         
         src_device = flatten_bbox_preds.device
-        flatten_class_preds.to('cpu')
-        flatten_objectness_scores.to('cpu')
-        flatten_output_grid_boxes.to('cpu')
-        flatten_decoded_bboxes.to('cpu')
+        flatten_class_preds = flatten_class_preds.to('cpu')
+        flatten_objectness_scores = flatten_objectness_scores.to('cpu')
+        flatten_output_grid_boxes = flatten_output_grid_boxes.to('cpu')
+        flatten_decoded_bboxes = flatten_decoded_bboxes.to('cpu')
         ground_truth_labels = [gt_label.to('cpu') for gt_label in ground_truth_labels]
         ground_truth_bboxes = [gt_bbox.to('cpu') for gt_bbox in ground_truth_bboxes]
 
