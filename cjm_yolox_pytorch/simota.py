@@ -113,52 +113,43 @@ class SimOTAAssigner():
         HIGH_COST_VALUE = 100000000
         num_gt = gt_bboxes.size(0)
         num_bboxes = decoded_bboxes.size(0)
-        
-        try:
-            # assign 0 by default
-            assigned_gt_inds = decoded_bboxes.new_full((num_bboxes, ), 0, dtype=torch.long)
-            if num_gt == 0 or num_bboxes == 0:
-                # No ground truth or boxes, return empty assignment
-                max_overlaps = decoded_bboxes.new_zeros((num_bboxes, ))
-                if num_gt == 0:
-                    # No truth, assign everything to background
-                    assigned_gt_inds[:] = 0
-                if gt_labels is None:
-                    assigned_labels = None
-                else:
-                    assigned_labels = decoded_bboxes.new_full((num_bboxes, ), -1, dtype=torch.long)
-                return AssignResult(num_gt, assigned_gt_inds, max_overlaps, category_labels=assigned_labels)
-        except:
-            print("An error occurred with creating AssignResult`\n: ", str(e))
-        
-        
-        try:
-            # Get info whether a output_grid_box is in gt bounding box and also the center of gt bounding box
-            valid_mask, is_in_boxes_and_center = self.get_in_gt_and_in_center_info(output_grid_boxes, gt_bboxes)
-        except Exception as e:
-            print("An error occurred with `self.get_in_gt_and_in_center_info()`\n: ", str(e))
 
+        # assign 0 by default
+        assigned_gt_inds = decoded_bboxes.new_full((num_bboxes, ), 0, dtype=torch.long)
+        if num_gt == 0 or num_bboxes == 0:
+            # No ground truth or boxes, return empty assignment
+            max_overlaps = decoded_bboxes.new_zeros((num_bboxes, ))
+            if num_gt == 0:
+                # No truth, assign everything to background
+                assigned_gt_inds[:] = 0
+            if gt_labels is None:
+                assigned_labels = None
+            else:
+                assigned_labels = decoded_bboxes.new_full((num_bboxes, ), -1, dtype=torch.long)
+            return AssignResult(num_gt, assigned_gt_inds, max_overlaps, category_labels=assigned_labels)
+        
+        # Get info whether a output_grid_box is in gt bounding box and also the center of gt bounding box
+        valid_mask, is_in_boxes_and_center = self.get_in_gt_and_in_center_info(output_grid_boxes, gt_bboxes)
+        
         # Extract valid bounding boxes and scores (i.e., those in ground truth boxes and centers)
         valid_decoded_bbox = decoded_bboxes[valid_mask]
         valid_pred_scores = pred_scores[valid_mask]
         num_valid = valid_decoded_bbox.size(0)
 
+        # Compute IoU between valid decoded bounding boxes and gt bounding boxes
+        pairwise_ious = torchvision.ops.generalized_box_iou(valid_decoded_bbox, gt_bboxes)
+            
+        # Compute IoU cost
+        iou_cost = -torch.log(pairwise_ious + eps)
+        
         
         try:
-            # Compute IoU between valid decoded bounding boxes and gt bounding boxes
-            pairwise_ious = torchvision.ops.generalized_box_iou(valid_decoded_bbox, gt_bboxes)
-        except:
-            print("An error occurred with `torchvision.ops.generalized_box_iou`\n: ", str(e))
+            # Convert gt_labels to one-hot format and calculate classification cost
+            gt_onehot_label = F.one_hot(gt_labels.to(torch.int64), pred_scores.shape[-1]).float().unsqueeze(0).repeat(num_valid, 1, 1)
+            valid_pred_scores = valid_pred_scores.unsqueeze(1).repeat(1, num_gt, 1)
+        except Exception as e:
+            print("An error occurred converting gt_labels to one-hot format and calculate classification cost`\n: ", str(e))
             
-        try:
-            # Compute IoU cost
-            iou_cost = -torch.log(pairwise_ious + eps)
-        except:
-            print("An error occurred with `torch.log`\n: ", str(e))
-
-        # Convert gt_labels to one-hot format and calculate classification cost
-        gt_onehot_label = F.one_hot(gt_labels.to(torch.int64), pred_scores.shape[-1]).float().unsqueeze(0).repeat(num_valid, 1, 1)
-        valid_pred_scores = valid_pred_scores.unsqueeze(1).repeat(1, num_gt, 1)
 #         cls_cost = F.binary_cross_entropy(valid_pred_scores.sqrt_(), gt_onehot_label, reduction='none').sum(-1)
 
         #-------------------------------
@@ -171,22 +162,16 @@ class SimOTAAssigner():
         # and assign a high cost (HIGH_COST_VALUE) for bboxes not in both boxes and centers
         cost_matrix = cls_cost * self.cls_weight + iou_cost * self.iou_weight + (~is_in_boxes_and_center) * HIGH_COST_VALUE
 
-        try:
-            # Perform matching between ground truth and valid bounding boxes based on the cost matrix
-            matched_pred_ious, matched_gt_inds = self.dynamic_k_matching(cost_matrix, pairwise_ious, num_gt, valid_mask)
-        except:
-            print("An error occurred with `self.dynamic_k_matching()`\n: ", str(e))
+        # Perform matching between ground truth and valid bounding boxes based on the cost matrix
+        matched_pred_ious, matched_gt_inds = self.dynamic_k_matching(cost_matrix, pairwise_ious, num_gt, valid_mask)
         
-        try:
-            # Convert to AssignResult format: assign matched gt indices, labels and IoU scores
-            assigned_gt_inds[valid_mask] = matched_gt_inds + 1
-            assigned_labels = assigned_gt_inds.new_full((num_bboxes, ), -1)
-            assigned_labels[valid_mask] = gt_labels[matched_gt_inds].long()
-            max_overlaps = assigned_gt_inds.new_full((num_bboxes, ), -HIGH_COST_VALUE, dtype=torch.float32)
-            max_overlaps[valid_mask] = matched_pred_ious
-        except:
-            print("An error occurred converting to AssignResult format`\n: ", str(e))
-            
+        # Convert to AssignResult format: assign matched gt indices, labels and IoU scores
+        assigned_gt_inds[valid_mask] = matched_gt_inds + 1
+        assigned_labels = assigned_gt_inds.new_full((num_bboxes, ), -1)
+        assigned_labels[valid_mask] = gt_labels[matched_gt_inds].long()
+        max_overlaps = assigned_gt_inds.new_full((num_bboxes, ), -HIGH_COST_VALUE, dtype=torch.float32)
+        max_overlaps[valid_mask] = matched_pred_ious
+                    
         return AssignResult(num_gt, assigned_gt_inds, max_overlaps, category_labels=assigned_labels)
 
     def get_in_gt_and_in_center_info(self, output_grid_boxes, gt_bboxes):
