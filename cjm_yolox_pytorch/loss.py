@@ -406,14 +406,13 @@ class YOLOXLoss:
         flatten_objectness_scores = flatten_objectness_scores.to(original_device)
         ground_truth_bboxes = [gt_bbox.to(original_device) for gt_bbox in ground_truth_bboxes]
         ground_truth_labels = [gt_label.to(original_device) for gt_label in ground_truth_labels]
-        positive_masks = [mask.to(original_device) for mask in positive_masks]
+        positive_masks = torch.cat([mask.to(original_device) for mask in positive_masks], 0)
         class_targets = [target.to(original_device) for target in class_targets]
         objectness_targets = [target.to(original_device) for target in objectness_targets]
         bbox_targets = [target.to(original_device) for target in bbox_targets]
         l1_targets = [target.to(original_device) for target in l1_targets]
 
         # Concatenate all positive masks, class targets, objectness targets, and bounding box targets
-        positive_masks = torch.cat(positive_masks, 0)
         class_targets = torch.cat(class_targets, 0)
         objectness_targets = torch.cat(objectness_targets, 0)
         bbox_targets = torch.cat(bbox_targets, 0)
@@ -449,4 +448,5 @@ class YOLOXLoss:
 
         # Return loss dictionary
         return loss_dict
+
 
