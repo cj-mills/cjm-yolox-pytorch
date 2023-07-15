@@ -242,6 +242,10 @@ class YOLOXLoss:
 
         # Generate bounding box targets
         bbox_targets = sampling_result.positive_ground_truth_bboxes
+        
+        #---------------------------------------
+        print(bbox_targets.shape)
+        #---------------------------------------
 
         # Initialize L1 targets as zeros
         l1_targets = class_preds.new_zeros((num_positive_per_image, 4))
@@ -262,85 +266,6 @@ class YOLOXLoss:
         new_shape = (batch_size, -1, reshape_dims) if reshape_dims else (batch_size, -1)
         return torch.cat([t.permute(0, 2, 3, 1).reshape(*new_shape) for t in tensors], dim=1)
 
-    
-#     def __call__(self, class_scores, predicted_bboxes, objectness_scores, ground_truth_bboxes, ground_truth_labels):
-#         """
-#         Main method to compute the YOLOX loss.
-
-#         Args:
-#             class_scores (List[torch.Tensor]): A list of class scores for each scale.
-#             predicted_bboxes (List[torch.Tensor]): A list of predicted bounding boxes for each scale.
-#             objectness_scores (List[torch.Tensor]): A list of objectness scores for each scale.
-#             ground_truth_bboxes (List[torch.Tensor]): A list of ground truth bounding boxes for each image.
-#             ground_truth_labels (List[torch.Tensor]): A list of ground truth labels for each image.
-
-#         Returns:
-#             Dict: A dictionary with the classification, bounding box, objectness, and optionally, L1 loss.
-#         """
-        
-#         # Get the number of images in the batch
-#         batch_size = class_scores[0].shape[0]
-        
-#         # Generate box coordinates for all grid priors.
-#         output_grid_boxes = generate_output_grids(*[s*self.strides[0] for s in class_scores[0].shape[-2:]], self.strides)
-#         output_grid_boxes[:, :2] *= output_grid_boxes[:, 2].unsqueeze(1)
-#         flatten_output_grid_boxes = torch.cat([output_grid_boxes, output_grid_boxes[:, 2:].clone()], dim=1)
-        
-#         # Flatten and concatenate class predictions, bounding box predictions, and objectness scores
-#         flatten_class_preds = self.flatten_and_concat(class_scores, batch_size, self.num_classes)
-#         flatten_bbox_preds = self.flatten_and_concat(predicted_bboxes, batch_size, 4)
-#         flatten_objectness_scores = self.flatten_and_concat(objectness_scores, batch_size)
-                    
-#         # Concatenate and decode box predictions
-#         flatten_output_grid_boxes = flatten_output_grid_boxes.to(flatten_bbox_preds.device)
-#         flatten_decoded_bboxes = self.bbox_decode(flatten_output_grid_boxes, flatten_bbox_preds)
-
-#         # Compute targets
-#         (positive_masks, class_targets, objectness_targets, bbox_targets, l1_targets,
-#          num_positive_images) = multi_apply(
-#              self.get_target_single, flatten_class_preds.detach(),
-#              flatten_objectness_scores.detach(),
-#              flatten_output_grid_boxes.unsqueeze(0).repeat(batch_size, 1, 1),
-#              flatten_decoded_bboxes.detach(), ground_truth_bboxes, ground_truth_labels)
-
-#         # Concatenate all positive masks, class targets, objectness targets, and bounding box targets
-#         positive_masks = torch.cat(positive_masks, 0)
-#         class_targets = torch.cat(class_targets, 0)
-#         objectness_targets = torch.cat(objectness_targets, 0)
-#         bbox_targets = torch.cat(bbox_targets, 0)
-
-#         # Compute bounding box loss
-#         loss_bbox = self.bbox_loss_func(flatten_decoded_bboxes.view(-1, 4)[positive_masks], bbox_targets)
-
-#         # Compute objectness loss
-#         loss_obj = self.objectness_loss_func(flatten_objectness_scores.view(-1, 1), objectness_targets)
-
-#         # Compute class loss
-#         loss_cls = self.class_loss_func(flatten_class_preds.view(-1, self.num_classes)[positive_masks],class_targets)
-        
-#         # Calculate total number of samples
-#         num_total_samples = max(sum(num_positive_images), 1)
-        
-#         # Scale losses
-#         loss_bbox = (loss_bbox * self.bbox_loss_weight) / num_total_samples
-#         loss_obj = (loss_obj * self.objectness_loss_weight) / num_total_samples
-#         loss_cls = (loss_cls * self.class_loss_weight) / num_total_samples
-        
-#         # Initialize loss dictionary
-#         loss_dict = dict(loss_cls=loss_cls, loss_bbox=loss_bbox, loss_obj=loss_obj)
-
-#         # If use_l1 is True, concatenate l1 targets, compute L1 loss and add it to the loss dictionary
-#         if self.use_l1:
-#             l1_targets = torch.cat(l1_targets, 0)
-#             loss_l1 = self.l1_loss_func(
-#                 flatten_bbox_preds.view(-1, 4)[positive_masks],
-#                 l1_targets) / num_total_samples
-#             loss_l1 *= self.l1_loss_weight
-#             loss_dict.update(loss_l1=loss_l1)
-
-#         # Return loss dictionary
-#         return loss_dict
-    
     
     def __call__(self, class_scores, predicted_bboxes, objectness_scores, ground_truth_bboxes, ground_truth_labels):
         """
@@ -374,80 +299,28 @@ class YOLOXLoss:
         flatten_output_grid_boxes = flatten_output_grid_boxes.to(flatten_bbox_preds.device)
         flatten_decoded_bboxes = self.bbox_decode(flatten_output_grid_boxes, flatten_bbox_preds)
 
-        
-        # ---------------------------
-        
-        # Prepare inputs for self.get_target_single
-        inputs = zip(flatten_class_preds.detach(), flatten_objectness_scores.detach(),
-                     flatten_output_grid_boxes.unsqueeze(0).repeat(batch_size, 1, 1),
-                     flatten_decoded_bboxes.detach(), ground_truth_bboxes, ground_truth_labels)
+        # Compute targets
+        (positive_masks, class_targets, objectness_targets, bbox_targets, l1_targets,
+         num_positive_images) = multi_apply(
+             self.get_target_single, flatten_class_preds.detach(),
+             flatten_objectness_scores.detach(),
+             flatten_output_grid_boxes.unsqueeze(0).repeat(batch_size, 1, 1),
+             flatten_decoded_bboxes.detach(), ground_truth_bboxes, ground_truth_labels)
 
-        # Apply self.get_target_single to each input, handling errors and collecting the results
-        target_results = apply_to_inputs(self.get_target_single, inputs)
-
-        # Process the target results
-        positive_masks, class_targets, objectness_targets, bbox_targets, l1_targets, num_positive_images = [], [], [], [], [], []
-        for result in target_results:
-            if result is not None:
-                positive_masks.append(result[0])
-                class_targets.append(result[1])
-                objectness_targets.append(result[2])
-                bbox_targets.append(result[3])
-                l1_targets.append(result[4])
-                num_positive_images.append(result[5])
-        
-        # Check if lists are empty and replace with empty tensors if they are
-        if len(positive_masks) == 0:
-            positive_masks = torch.empty((0,), dtype=torch.bool, device=class_scores[0].device)
-        else:
-            positive_masks = torch.cat(positive_masks, 0)
-
-        if len(class_targets) == 0:
-            class_targets = torch.empty((0,), dtype=torch.long, device=class_scores[0].device)
-        else:
-            class_targets = torch.cat(class_targets, 0)
-
-        if len(objectness_targets) == 0:
-            objectness_targets = torch.empty((0, 1), dtype=torch.float32, device=class_scores[0].device)
-        else:
-            objectness_targets = torch.cat(objectness_targets, 0)
-
-        if len(bbox_targets) == 0:
-            bbox_targets = torch.empty((0, 4), dtype=torch.float32, device=class_scores[0].device)
-        else:
-            bbox_targets = torch.cat(bbox_targets, 0)
-
-        # ---------------------------
-
-#         # Concatenate all positive masks, class targets, objectness targets, and bounding box targets
-#         positive_masks = torch.cat(positive_masks, 0)
-#         class_targets = torch.cat(class_targets, 0)
-#         objectness_targets = torch.cat(objectness_targets, 0)
-#         bbox_targets = torch.cat(bbox_targets, 0)
-
-#         # Compute bounding box loss
-#         loss_bbox = self.bbox_loss_func(flatten_decoded_bboxes.view(-1, 4)[positive_masks], bbox_targets)
-
-#         # Compute objectness loss
-#         loss_obj = self.objectness_loss_func(flatten_objectness_scores.view(-1, 1), objectness_targets)
-
-#         # Compute class loss
-#         loss_cls = self.class_loss_func(flatten_class_preds.view(-1, self.num_classes)[positive_masks],class_targets)
+        # Concatenate all positive masks, class targets, objectness targets, and bounding box targets
+        positive_masks = torch.cat(positive_masks, 0)
+        class_targets = torch.cat(class_targets, 0)
+        objectness_targets = torch.cat(objectness_targets, 0)
+        bbox_targets = torch.cat(bbox_targets, 0)
 
         # Compute bounding box loss
-        if positive_masks.shape[0] > 0:
-            loss_bbox = self.bbox_loss_func(flatten_decoded_bboxes.view(-1, 4)[positive_masks], bbox_targets)
-        else:
-            loss_bbox = torch.tensor(0.)#.to(class_scores[0].device)
+        loss_bbox = self.bbox_loss_func(flatten_decoded_bboxes.view(-1, 4)[positive_masks], bbox_targets)
 
         # Compute objectness loss
         loss_obj = self.objectness_loss_func(flatten_objectness_scores.view(-1, 1), objectness_targets)
 
         # Compute class loss
-        if positive_masks.shape[0] > 0:
-            loss_cls = self.class_loss_func(flatten_class_preds.view(-1, self.num_classes)[positive_masks], class_targets)
-        else:
-            loss_cls = torch.tensor(0.)#.to(class_scores[0].device)
+        loss_cls = self.class_loss_func(flatten_class_preds.view(-1, self.num_classes)[positive_masks],class_targets)
         
         # Calculate total number of samples
         num_total_samples = max(sum(num_positive_images), 1)
@@ -460,26 +333,14 @@ class YOLOXLoss:
         # Initialize loss dictionary
         loss_dict = dict(loss_cls=loss_cls, loss_bbox=loss_bbox, loss_obj=loss_obj)
 
-#         # If use_l1 is True, concatenate l1 targets, compute L1 loss and add it to the loss dictionary
-#         if self.use_l1:
-#             l1_targets = torch.cat(l1_targets, 0)
-#             loss_l1 = self.l1_loss_func(
-#                 flatten_bbox_preds.view(-1, 4)[positive_masks],
-#                 l1_targets) / num_total_samples
-#             loss_l1 *= self.l1_loss_weight
-#             loss_dict.update(loss_l1=loss_l1)
-
-        # For L1 loss, do the same
+        # If use_l1 is True, concatenate l1 targets, compute L1 loss and add it to the loss dictionary
         if self.use_l1:
-            if positive_masks.shape[0] > 0:
-                l1_targets = torch.cat(l1_targets, 0)
-                loss_l1 = self.l1_loss_func(
-                    flatten_bbox_preds.view(-1, 4)[positive_masks],
-                    l1_targets) / num_total_samples
-                loss_l1 *= self.l1_loss_weight
-                loss_dict.update(loss_l1=loss_l1)
-            else:
-                loss_dict.update(loss_l1=torch.tensor(0.).to(class_scores[0].device))
+            l1_targets = torch.cat(l1_targets, 0)
+            loss_l1 = self.l1_loss_func(
+                flatten_bbox_preds.view(-1, 4)[positive_masks],
+                l1_targets) / num_total_samples
+            loss_l1 *= self.l1_loss_weight
+            loss_dict.update(loss_l1=loss_l1)
 
         # Return loss dictionary
         return loss_dict
