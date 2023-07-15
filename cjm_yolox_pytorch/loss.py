@@ -218,13 +218,22 @@ class YOLOXLoss:
         # Calculate the offset for the prior boxes
         offset_output_grid_boxes = torch.cat([output_grid_boxes[:, :2] + output_grid_boxes[:, 2:] * 0.5, output_grid_boxes[:, 2:]], dim=-1)
 
-        # Assign ground truth objects to prior boxes and get assignment results
-        assignment_result = self.assigner.assign(
-            class_preds.sigmoid() * objectness_score.unsqueeze(1).sigmoid(),
-            offset_output_grid_boxes, decoded_bboxes, ground_truth_bboxes, ground_truth_labels)
+        
+        try:
+            
+            # Assign ground truth objects to prior boxes and get assignment results
+            assignment_result = self.assigner.assign(
+                class_preds.sigmoid() * objectness_score.unsqueeze(1).sigmoid(),
+                offset_output_grid_boxes, decoded_bboxes, ground_truth_bboxes, ground_truth_labels)
+        except Exception as e:
+            print("An error occurred with `self.assigner.assign()`\n: ", str(e))
 
-        # Use assignment results to sample prior boxes
-        sampling_result = self.sample(assignment_result, output_grid_boxes, ground_truth_bboxes)
+        
+        try:
+            # Use assignment results to sample prior boxes
+            sampling_result = self.sample(assignment_result, output_grid_boxes, ground_truth_bboxes)
+        except Exception as e:
+            print("An error occurred with `self.sample`\n: ", str(e))
         
         # Get the indices of positive (object-containing) samples
         positive_indices = sampling_result.positive_indices
@@ -242,10 +251,6 @@ class YOLOXLoss:
 
         # Generate bounding box targets
         bbox_targets = sampling_result.positive_ground_truth_bboxes
-        
-        #---------------------------------------
-        print(bbox_targets.shape)
-        #---------------------------------------
 
         # Initialize L1 targets as zeros
         l1_targets = class_preds.new_zeros((num_positive_per_image, 4))
