@@ -152,10 +152,11 @@ class SimOTAAssigner():
         try:
             #-------------------------------
             epsilon = 1e-7
-            valid_pred_scores = torch.sigmoid(valid_pred_scores).clamp(min=epsilon, max=1-epsilon)
+            valid_pred_scores = torch.sigmoid(valid_pred_scores.clamp(min=epsilon, max=1-epsilon))
             cls_cost = F.binary_cross_entropy(valid_pred_scores, gt_onehot_label, reduction='none').sum(-1)
             #-------------------------------
         except Exception as e:
+            print("An error occurred:\n", str(e))
             print(valid_pred_scores.min(), valid_pred_scores.max())
             print(gt_onehot_label.min(), gt_onehot_label.max())
 
