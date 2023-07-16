@@ -143,20 +143,23 @@ class SimOTAAssigner():
         iou_cost = -torch.log(pairwise_ious + eps)
         
         
-        try:
-            # Convert gt_labels to one-hot format and calculate classification cost
-            gt_onehot_label = F.one_hot(gt_labels.to(torch.int64), pred_scores.shape[-1]).float().unsqueeze(0).repeat(num_valid, 1, 1)
-            valid_pred_scores = valid_pred_scores.unsqueeze(1).repeat(1, num_gt, 1)
-        except Exception as e:
-            print("An error occurred converting gt_labels to one-hot format and calculate classification cost`\n: ", str(e))
+        # Convert gt_labels to one-hot format and calculate classification cost
+        gt_onehot_label = F.one_hot(gt_labels.to(torch.int64), pred_scores.shape[-1]).float().unsqueeze(0).repeat(num_valid, 1, 1)
+        valid_pred_scores = valid_pred_scores.unsqueeze(1).repeat(1, num_gt, 1)
             
 #         cls_cost = F.binary_cross_entropy(valid_pred_scores.sqrt_(), gt_onehot_label, reduction='none').sum(-1)
 
-        #-------------------------------
-        valid_pred_scores = torch.sigmoid(valid_pred_scores)  # apply sigmoid to transform scores into probabilities
-        cls_cost = F.binary_cross_entropy(valid_pred_scores, gt_onehot_label, reduction='none').sum(-1)
-        #-------------------------------
-        
+        try:
+            #-------------------------------
+            epsilon = 1e-7
+            valid_pred_scores = torch.sigmoid(valid_pred_scores).clamp(min=epsilon, max=1-epsilon)
+            cls_cost = F.binary_cross_entropy(valid_pred_scores, gt_onehot_label, reduction='none').sum(-1)
+            #-------------------------------
+        except Exception as e:
+            print(valid_pred_scores.min(), valid_pred_scores.max())
+            print(gt_onehot_label.min(), gt_onehot_label.max())
+
+            
         
         # Calculate total cost matrix by combining classification and IoU costs, 
         # and assign a high cost (HIGH_COST_VALUE) for bboxes not in both boxes and centers
