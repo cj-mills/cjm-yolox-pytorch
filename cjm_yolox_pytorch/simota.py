@@ -29,38 +29,18 @@ class AssignResult:
     max_iou_values: torch.FloatTensor # The Intersection over Union (IoU) between the predicted bounding box and its assigned actual truth box.
     category_labels: torch.LongTensor = field(default=None) # If specified, for each predicted bounding box, this indicates the category label of the assigned actual truth box.
 
-# %% ../nbs/03_simota.ipynb 9
+# %% ../nbs/03_simota.ipynb 8
 class SimOTAAssigner():
     """
-    Computes matching between predictions and ground truth.
+    The `SimOTAAssigner` class assigns predicted bounding boxes to their corresponding ground truth boxes in object detection tasks. 
+    It uses a process called SimOTA that formulates the assignment task as an optimal transport problem via a dynamic top-k strategy.
+    
+    It calculates a cost matrix based on classification and regression (Intersection over Union, IoU) costs. 
+    It then uses this cost matrix to dynamically assign each ground truth object to the best matching bounding box predictions while resolving conflicts to ensure each prediction pairs with a single ground truth.
     
     Based on OpenMMLab's implementation in the mmdetection library:
     
     - [OpenMMLab's Implementation](https://github.com/open-mmlab/mmdetection/blob/d64e719172335fa3d7a757a2a3636bd19e9efb62/mmdet/core/bbox/assigners/sim_ota_assigner.py#L14)
-    
-    
-    #### Pseudocode
-
-    1. Receive as input: predicted_scores, output_grid_boxes, decoded_bounding_boxes, ground_truth_bounding_boxes, and ground_truth_labels. These are all tensors.
-    2. Initialize a large value for HIGH_COST_VALUE.
-    3. Calculate the number of ground truth bounding boxes and predicted bounding boxes.
-    4. Create a tensor `assigned_gt_inds` with the same size as the number of predicted bounding boxes and fill it with zeros. 
-    5. If there are no ground truth bounding boxes or predicted bounding boxes, return an `AssignResult` with no assignments.
-    6. If there are no ground truth bounding boxes, assign all predicted bounding boxes to the background.
-    7. Calculate which output_grid_boxes are within a ground truth bounding box and which output_grid_boxes are in the center of a ground truth bounding box.
-    8. Extract the valid decoded bounding boxes and valid predicted scores, i.e., those that are inside a ground truth bounding box and at the center.
-    9. Compute the IoU between valid bounding boxes and ground truth bounding boxes. 
-        - Calculate the IoU cost by taking the negative logarithm of this IoU.
-    10. Convert the ground truth labels to one-hot format and calculate the classification cost using the valid predicted scores and one-hot ground truth labels.
-    11. Calculate the total cost matrix by adding up the classification cost, the IoU cost and, if not within a ground truth bounding box and at the center, a high cost.
-    12. Use the dynamic_k_matching method on the cost matrix to perform a dynamic matching between the ground truth bounding boxes and valid bounding boxes.
-        - Obtain the matched ground truth indices and IoU scores.
-    13. Update the `assigned_gt_inds` with the matched ground truth indices.
-    14. Create a tensor `assigned_labels` of the same size as `assigned_gt_inds`, and fill it with -1.
-        - Update `assigned_labels` with the labels of the matched ground truth boxes.
-    15. Create a tensor `max_overlaps` of the same size as `assigned_gt_inds`, and fill it with -HIGH_COST_VALUE.
-        - Update `max_overlaps` with the IoU scores of the matched ground truth boxes.
-    16. Return an instance of `AssignResult` with the number of ground truth boxes, the `assigned_gt_inds`, `max_overlaps`, and `assigned_labels`.
     
     """
 
@@ -76,39 +56,20 @@ class SimOTAAssigner():
         self.cls_weight = cls_weight
 
     def assign(self,
-           pred_scores,
-           output_grid_boxes,
-           decoded_bboxes,
-           gt_bboxes,
-           gt_labels,
-           gt_bboxes_ignore=None,
-           eps=1e-7):
-        """Assign ground truth to output_grid_boxes using SimOTA (Similarity-Overlap-Training-Assignment).
+               pred_scores:torch.Tensor, # Classification scores of each output grid box across all classes.
+               output_grid_boxes:torch.Tensor, # Output grid bounding boxes of one image in format [cx, xy, stride_w, stride_y].
+               decoded_bboxes:torch.Tensor, # Predicted bounding boxes of one image in format [tl_x, tl_y, br_x, br_y].
+               gt_bboxes:torch.Tensor, # Ground truth bounding boxes of one image in format [tl_x, tl_y, br_x, br_y].
+               gt_labels:torch.Tensor, # Ground truth labels of one image, It is a Tensor with shape [num_gts].
+               gt_bboxes_ignore:Optional[torch.Tensor]=None, # Ground truth bounding boxes that are labelled as `ignored`, e.g., crowd boxes in COCO.
+               eps:float=1e-7 # A value added to the denominator for numerical stability.
+              ):
+        """Assign ground truth to output_grid_boxes using SimOTA.
 
-        This method finds the best assignment of predicted bounding boxes (output_grid_boxes) to 
-        the ground truth bounding boxes (gt) based on a combination of classification and 
-        regression (IoU) costs.
-
-        Args:
-            pred_scores (Tensor): Classification scores of each output grid box across all classes. 
-                It is a 2D-Tensor with shape [num_output_grid_boxes, num_classes].
-            output_grid_boxes (Tensor): Output grid bounding boxes of one image in format [cx, xy, stride_w, stride_y].
-                It is a 2D-Tensor with shape [num_output_grid_boxes, 4].
-            decoded_bboxes (Tensor): Predicted bounding boxes of one image in format [tl_x, tl_y, br_x, br_y].
-                It is a 2D-Tensor with shape [num_output_grid_boxes, 4].
-            gt_bboxes (Tensor): Ground truth bounding boxes of one image in format [tl_x, tl_y, br_x, br_y].
-                It is a 2D-Tensor with shape [num_gts, 4].
-            gt_labels (Tensor): Ground truth labels of one image, 
-                It is a Tensor with shape [num_gts].
-            gt_bboxes_ignore (Tensor, optional): Ground truth bounding boxes that are
-                labelled as `ignored`, e.g., crowd boxes in COCO.
-            eps (float): A value added to the denominator for numerical
-                stability. Default 1e-7.
-
-        Returns:
-            :obj:`AssignResult`: The assigned result. This includes information about the index 
-                of the ground truth box each prediction is assigned to, the IoU between the 
-                predictions and their assigned ground truth, and the category labels for each prediction.
+        This method assigns predicted bounding boxes to ground truth boxes based on the computed cost matrix. 
+        It first extracts valid box predictions and scores. 
+        It then calculates the total cost matrix using IoU and classification costs. 
+        Finally, it uses the cost matrix to assign each prediction to a ground truth box.
         """
         HIGH_COST_VALUE = 100000000
         num_gt = gt_bboxes.size(0)
@@ -141,8 +102,7 @@ class SimOTAAssigner():
             
         # Compute IoU cost
         iou_cost = -torch.log(pairwise_ious + eps)
-        
-        
+                
         # Convert gt_labels to one-hot format and calculate classification cost
         gt_onehot_label = F.one_hot(gt_labels.to(torch.int64), pred_scores.shape[-1]).float().unsqueeze(0).repeat(num_valid, 1, 1)
         valid_pred_scores = valid_pred_scores.unsqueeze(1).repeat(1, num_gt, 1)
@@ -167,18 +127,15 @@ class SimOTAAssigner():
                     
         return AssignResult(num_gt, assigned_gt_inds, max_overlaps, category_labels=assigned_labels)
 
-    def get_in_gt_and_in_center_info(self, output_grid_boxes, gt_bboxes):
+    def get_in_gt_and_in_center_info(self, 
+                                     output_grid_boxes:torch.Tensor, # All output_grid_boxes of one image, a 2D-Tensor with shape [num_output_grid_boxes, 4] in [cx, xy, stride_w, stride_y] format.
+                                     gt_bboxes # Ground truth bboxes of one image, a 2D-Tensor with shape [num_gts, 4] in [tl_x, tl_y, br_x, br_y] format.
+                                    ) -> Tuple[torch.Tensor, torch.Tensor]: # The first tensor indicates if the output_grid_box is in any ground truth box or center, the second tensor specifies if the output_grid_box is in both the ground truth box and center.
         """Get the information about whether output_grid_boxes are in ground truth boxes or center.
-
-        Args:
-            output_grid_boxes (Tensor): All output_grid_boxes of one image, a 2D-Tensor with shape [num_output_grid_boxes, 4]
-                in [cx, xy, stride_w, stride_y] format.
-            gt_bboxes (Tensor): Ground truth bboxes of one image, a 2D-Tensor
-                with shape [num_gts, 4] in [tl_x, tl_y, br_x, br_y] format.
-
-        Returns:
-            Tuple[Tensor, Tensor]: The first tensor indicates if the output_grid_box is in any ground truth box or center, 
-            the second tensor specifies if the output_grid_box is in both the ground truth box and center.
+        
+        This method determines which predicted boxes are inside a ground truth box and also at the center of the ground truth box. 
+        It computes the centers of the ground truth boxes, checks if the predicted boxes are inside the ground truth boxes and centers, 
+        and then returns a mask indicating which predicted boxes are in either any ground truth box or any center box and which are in both.
         """
 
         # Calculate the centers of the ground truth boxes
@@ -217,26 +174,17 @@ class SimOTAAssigner():
 
         return is_in_gts_or_centers, is_in_boxes_and_centers
     
-    def dynamic_k_matching(self, cost, pairwise_ious, num_gt, valid_mask):
+    def dynamic_k_matching(self, 
+                           cost:torch.Tensor, # A 2D tensor representing the cost matrix calculated from both classification cost and regression IoU cost. Shape is [num_output_grid_boxes, num_gts].
+                           pairwise_ious:torch.Tensor, # A 2D tensor representing IoU scores between predictions and ground truths. Shape is [num_output_grid_boxes, num_gts].
+                           num_gt:int, # The number of ground truth boxes.
+                           valid_mask:torch.Tensor # A 1D tensor representing which predicted boxes are valid based on being in gt bboxes and in centers. Shape is [num_output_grid_boxes].
+                          ) -> Tuple[torch.Tensor, torch.Tensor]: # (IoU scores for matched pairs, The indices of the ground truth for each output_grid_box)
         """
-        This method performs dynamic k-matching. This is a core part of the SimOTA assignment
-        where each ground truth object dynamically chooses k bounding box predictions that best 
-        match itself according to the cost matrix. Then, if there are any conflicts (i.e., one 
-        prediction is selected by multiple ground truths), the conflicts are resolved by choosing 
-        the pair with the smallest cost.
-
-        Args:
-            cost (Tensor): A 2D tensor representing the cost matrix calculated from both 
-                classification cost and regression IoU cost. Shape is [num_output_grid_boxes, num_gts].
-            pairwise_ious (Tensor): A 2D tensor representing IoU scores between predictions and 
-                ground truths. Shape is [num_output_grid_boxes, num_gts].
-            num_gt (int): The number of ground truth boxes.
-            valid_mask (Tensor): A 1D tensor representing which predicted boxes are valid based 
-                on being in gt bboxes and in centers. Shape is [num_output_grid_boxes].
-
-        Returns:
-            matched_pred_ious (Tensor): IoU scores for matched pairs. Shape is [num_output_grid_boxes].
-            matched_gt_inds (Tensor): The indices of the ground truth for each output_grid_box. Shape is [num_output_grid_boxes].
+        This method performs the dynamic k-matching process. 
+        For each ground truth box, it finds the top-k matching box predictions based on the smallest cost. 
+        If a predicted box matches multiple ground truths, it keeps only the one with the smallest cost. 
+        Finally, it returns the matched ground-truth indices and IoUs for valid predicted boxes.
         """
 
         # Initialize the matching matrix with zeros
