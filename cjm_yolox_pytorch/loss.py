@@ -4,7 +4,7 @@
 __all__ = ['SamplingResult', 'YOLOXLoss']
 
 # %% ../nbs/02_loss.ipynb 3
-from typing import Any, Type, List, Optional, Callable, Tuple, Union
+from typing import Any, Type, List, Optional, Callable, Tuple, Union, Dict
 from functools import partial
 from dataclasses import dataclass, field
 
@@ -93,6 +93,14 @@ class YOLOXLoss:
                  strides:List[int]=[8,16,32] # The list of strides.
                 ):
         
+        """
+        The `__init__` method defines several parameters for computing the loss, 
+        and it initializes different loss functions, 
+        such as [Generalized IoU](https://pytorch.org/vision/stable/generated/torchvision.ops.generalized_box_iou_loss.html) for bounding box loss, 
+        [binary cross entropy with logits](https://pytorch.org/docs/stable/generated/torch.nn.functional.binary_cross_entropy_with_logits.html) for classification and objectness loss, 
+        and [L1 loss](https://pytorch.org/docs/stable/generated/torch.nn.functional.l1_loss.html#torch.nn.functional.l1_loss) if applicable.
+        """
+        
         self.num_classes = num_classes
         
         giou_loss_partial = partial(torchvision.ops.generalized_box_iou_loss, reduction='none', eps=1e-16)
@@ -114,16 +122,14 @@ class YOLOXLoss:
         self.strides = strides
         
         
-    def bbox_decode(self, output_grid_boxes, predicted_boxes):
+    def bbox_decode(self, 
+                    output_grid_boxes:torch.Tensor, # The output grid boxes.
+                    predicted_boxes:torch.Tensor # The predicted bounding boxes.
+                   ) -> torch.Tensor: # The decoded bounding boxes.
         """
-        Decodes the predicted bounding boxes based on the prior boxes.
-
-        Args:
-            output_grid_boxes (torch.Tensor): The output grid boxes.
-            predicted_boxes (torch.Tensor): The predicted bounding boxes.
-
-        Returns:
-            torch.Tensor: The decoded bounding boxes.
+        Decodes the predicted bounding boxes based on the output grid boxes. 
+        Positive indices are those where the ground truth box indices are greater-than zero (indicating a match with a ground truth object), 
+        and the negatives are where the ground truth box indices are zero (meaning it does not pair with a ground truth object).
         """
         # Calculate box centroids (geometric centers) and sizes
         box_centroids = (predicted_boxes[..., :2] * output_grid_boxes[:, 2:]) + output_grid_boxes[:, :2]
@@ -139,17 +145,13 @@ class YOLOXLoss:
         return decoded_boxes
 
 
-    def sample(self, assignment_result, bboxes, ground_truth_boxes, **kwargs):
+    def sample(self, 
+               assignment_result:AssignResult, # The assignment result obtained from assigner.
+               bboxes:torch.Tensor, #  The predicted bounding boxes.
+               ground_truth_boxes:torch.Tensor, # The ground truth boxes.
+              ) -> SamplingResult: # The sampling result containing positive and negative indices.
         """
         Samples positive and negative indices based on the assignment result.
-        
-        Args:
-            assignment_result (Object): The assignment result obtained from assigner.
-            bboxes (torch.Tensor): The predicted bounding boxes.
-            ground_truth_boxes (torch.Tensor): The ground truth boxes.
-
-        Returns:
-            SamplingResult: The sampling result containing positive and negative indices.
         """
         positive_indices = torch.nonzero(
             assignment_result.ground_truth_box_indices > 0, as_tuple=False).squeeze(-1).unique()
@@ -161,18 +163,15 @@ class YOLOXLoss:
         return sampling_result
 
 
-    def get_l1_target(self, l1_target, ground_truth_boxes, output_grid_boxes, epsilon=1e-8):
+    def get_l1_target(self, 
+                      l1_target:torch.Tensor, # The L1 target tensor.
+                      ground_truth_boxes:torch.Tensor, # The ground truth boxes.
+                      output_grid_boxes:torch.Tensor, # The output grid boxes.
+                      epsilon:float=1e-8 # A small value to prevent division by zero.
+                     ) -> torch.Tensor: # The updated L1 target.
         """
-        Calculates the L1 target.
-
-        Args:
-            l1_target (torch.Tensor): The L1 target tensor.
-            ground_truth_boxes (torch.Tensor): The ground truth boxes.
-            output_grid_boxes (torch.Tensor): The output grid boxes.
-            epsilon (float, optional): A small value to prevent division by zero. Defaults to 1e-8.
-
-        Returns:
-            torch.Tensor: The updated L1 target.
+        Calculates the L1 target, which measures the absolute differences between the predicted and actual values. 
+        The L1 loss measures how well the model’s predictions match the ground truth values.
         """
         ground_truth_centroid_and_wh = torchvision.ops.box_convert(ground_truth_boxes, 'xyxy', 'cxcywh')
         l1_target[:, :2] = (ground_truth_centroid_and_wh[:, :2] - output_grid_boxes[:, :2]) / output_grid_boxes[:, 2:]
@@ -180,22 +179,18 @@ class YOLOXLoss:
         return l1_target
 
 
-    def get_target_single(self, class_preds, objectness_score, output_grid_boxes, decoded_bboxes,
-                           ground_truth_bboxes, ground_truth_labels):
+    def get_target_single(self, 
+                          class_preds:torch.Tensor, # The predicted class probabilities.
+                          objectness_score:torch.Tensor, # The predicted objectness scores.
+                          output_grid_boxes:torch.Tensor, # The output grid boxes.
+                          decoded_bboxes:torch.Tensor, # The decoded bounding boxes.
+                          ground_truth_bboxes:torch.Tensor, # The ground truth boxes.
+                          ground_truth_labels:torch.Tensor # The ground truth labels.
+                         ) -> Tuple: # The targets for classification, objectness, bounding boxes, and L1 (if applicable), along with the foreground mask and the number of positive samples.
         """
-        Calculates the targets for a single image.
-
-        Args:
-            class_preds (torch.Tensor): The predicted class probabilities.
-            objectness_score (torch.Tensor): The predicted objectness scores.
-            output_grid_boxes (torch.Tensor): The output grid boxes.
-            decoded_bboxes (torch.Tensor): The decoded bounding boxes.
-            ground_truth_bboxes (torch.Tensor): The ground truth boxes.
-            ground_truth_labels (torch.Tensor): The ground truth labels.
-
-        Returns:
-            Tuple: The targets for classification, objectness, bounding boxes, and L1 (if applicable), along with
-            the foreground mask and the number of positive samples.
+        Calculates the targets for a single image. 
+        It assigns ground truth objects to output grid boxes and samples output grid boxes based on the assignment results. 
+        It then generates class targets, objectness targets, bounding box targets, and, optionally, L1 targets.
         """
         # Get the number of prior boxes and ground truth labels
         num_output_grid_boxes = output_grid_boxes.size(0)
@@ -259,24 +254,32 @@ class YOLOXLoss:
         return (foreground_mask, class_targets, objectness_targets, bbox_targets, l1_targets, num_positive_per_image)
     
     
-    def flatten_and_concat(self, tensors, batch_size, reshape_dims=None):
+    def flatten_and_concat(self, 
+                           tensors:List[torch.Tensor], # A list of tensors to flatten and concatenate.
+                           batch_size:int, # The batch size used to reshape the concatenated tensor.
+                           reshape_dims:Optional[bool]=None # 
+                          ) -> torch.Tensor: # The concatenated tensor
+        """
+        Flatten and concatenate a list of tensors.
+        """
         new_shape = (batch_size, -1, reshape_dims) if reshape_dims else (batch_size, -1)
         return torch.cat([t.permute(0, 2, 3, 1).reshape(*new_shape) for t in tensors], dim=1)
 
     
-    def __call__(self, class_scores, predicted_bboxes, objectness_scores, ground_truth_bboxes, ground_truth_labels):
+    def __call__(self, 
+                 class_scores:List[torch.Tensor], # A list of class scores for each scale.
+                 predicted_bboxes:List[torch.Tensor], # A list of predicted bounding boxes for each scale.
+                 objectness_scores:List[torch.Tensor], # A list of objectness scores for each scale.
+                 ground_truth_bboxes:List[torch.Tensor], # A list of ground truth bounding boxes for each image.
+                 ground_truth_labels:List[torch.Tensor] # A list of ground truth labels for each image.
+                ) -> Dict: # A dictionary with the classification, bounding box, objectness, and optionally, L1 loss.
         """
-        Main method to compute the YOLOX loss.
-
-        Args:
-            class_scores (List[torch.Tensor]): A list of class scores for each scale.
-            predicted_bboxes (List[torch.Tensor]): A list of predicted bounding boxes for each scale.
-            objectness_scores (List[torch.Tensor]): A list of objectness scores for each scale.
-            ground_truth_bboxes (List[torch.Tensor]): A list of ground truth bounding boxes for each image.
-            ground_truth_labels (List[torch.Tensor]): A list of ground truth labels for each image.
-
-        Returns:
-            Dict: A dictionary with the classification, bounding box, objectness, and optionally, L1 loss.
+        The `__call__` method computes the loss values. 
+        It first generates box coordinates for the output grids based on the input dimensions and stride values. 
+        It then flattens and concatenates class predictions, bounding box predictions, and objectness scores. 
+        Next, it decodes the bounding box predictions, computes targets for each image in the batch, 
+        and finally computes the bounding box loss, objectness loss, and classification loss (and L1 loss, optionally). 
+        These losses are scaled by their respective weights and normalized by the total number of samples.
         """
         
         # Get the number of images in the batch
