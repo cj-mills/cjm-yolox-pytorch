@@ -16,7 +16,7 @@ import torch.nn.functional as F
 import torchvision
 
 # %% ../nbs/02_loss.ipynb 5
-from .utils import multi_apply, generate_output_grids, apply_to_inputs
+from .utils import multi_apply, generate_output_grids
 from .simota import AssignResult, SimOTAAssigner
 
 # %% ../nbs/02_loss.ipynb 7
