@@ -105,8 +105,10 @@ class YOLOXLoss:
         
         giou_loss_partial = partial(torchvision.ops.generalized_box_iou_loss, reduction='none', eps=1e-16)
         self.bbox_loss_func = lambda bx1, bx2 : (1-(1-giou_loss_partial(boxes1=bx1, boxes2=bx2))**2).sum()
-        self.class_loss_func = partial(F.binary_cross_entropy_with_logits, reduction='sum')
-        self.objectness_loss_func = partial(F.binary_cross_entropy_with_logits, reduction='sum')
+#         self.class_loss_func = partial(F.binary_cross_entropy_with_logits, reduction='sum')
+        self.class_loss_func = torch.nn.BCEWithLogitsLoss(reduction='sum')
+#         self.objectness_loss_func = partial(F.binary_cross_entropy_with_logits, reduction='sum')
+        self.objectness_loss_func = torch.nn.BCEWithLogitsLoss(reduction='sum')
         self.l1_loss_func = partial(F.l1_loss, reduction='sum')
         
         self.bbox_loss_weight = bbox_loss_weight
