@@ -291,9 +291,9 @@ class YOLOXLoss:
         flatten_output_grid_boxes = torch.cat([output_grid_boxes, output_grid_boxes[:, 2:].clone()], dim=1)
         
         # Flatten and concatenate class predictions, bounding box predictions, and objectness scores
-        flatten_class_preds = self.flatten_and_concat(class_scores, batch_size, self.num_classes).float()
-        flatten_bbox_preds = self.flatten_and_concat(predicted_bboxes, batch_size, 4).float()
-        flatten_objectness_scores = self.flatten_and_concat(objectness_scores, batch_size).float()
+        flatten_class_preds = self.flatten_and_concat(class_scores, batch_size, self.num_classes)#.float()
+        flatten_bbox_preds = self.flatten_and_concat(predicted_bboxes, batch_size, 4)#.float()
+        flatten_objectness_scores = self.flatten_and_concat(objectness_scores, batch_size)#.float()
                     
         # Concatenate and decode box predictions
         flatten_output_grid_boxes = flatten_output_grid_boxes.to(flatten_bbox_preds.device)
