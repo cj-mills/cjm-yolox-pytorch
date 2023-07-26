@@ -283,7 +283,6 @@ class Focus(nn.Module):
         )
         return self.conv(x)
 
-
 # %% ../nbs/00_model.ipynb 19
 class SPPBottleneck(nn.Module):
     """
@@ -673,7 +672,6 @@ class YOLOXHead(nn.Module):
                            self.multi_level_conv_cls,
                            self.multi_level_conv_reg,
                            self.multi_level_conv_obj)
-
 
 # %% ../nbs/00_model.ipynb 30
 class YOLOX(nn.Module):
