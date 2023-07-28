@@ -770,8 +770,9 @@ def build_model(model_type:str, # Type of the model to be built.
             checkpoint_path = os.path.join(checkpoint_dir, Path(url).name)
             download_file(url, checkpoint_dir)
             
-            pretrained_ckpt = torch.load(checkpoint_path)['state_dict']
-            num_pretrained_classes = pretrained_ckpt['bbox_head.multi_level_conv_cls.0.weight'].shape[0]
+            pretrained_ckpt = torch.load(checkpoint_path)
+            state_dict = pretrained_ckpt['state_dict'] if pretrained_ckpt['state_dict'] else pretrained_ckpt
+            num_pretrained_classes = state_dict['bbox_head.multi_level_conv_cls.0.weight'].shape[0]
             
             head = YOLOXHead(num_classes=num_pretrained_classes, **head_cfg)
         else:
@@ -780,7 +781,7 @@ def build_model(model_type:str, # Type of the model to be built.
         yolox = YOLOX(backbone, neck, head)
         
         if pretrained:
-            yolox.load_state_dict(pretrained_ckpt)
+            yolox.load_state_dict(state_dict)
             init_head(head, num_classes)
             
     except Exception as e:
