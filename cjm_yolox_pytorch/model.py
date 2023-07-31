@@ -61,12 +61,18 @@ PRETRAINED_URLS = {
 NORM_CFG = dict(momentum=0.03, eps=0.001)
 
 
-NORM_STATS = dict(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
+NORM_STATS = {
+    MODEL_TYPES[0]:dict(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+    MODEL_TYPES[1]:dict(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+    MODEL_TYPES[2]:dict(mean=(0.5, 0.5, 0.5), std=(1.0, 1.0, 1.0)),
+    MODEL_TYPES[3]:dict(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+    MODEL_TYPES[4]:dict(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+}
+
 
 MODEL_CFGS = {model_type: {**CSP_DARKNET_CFGS[model_type], 
                             **{'neck_'+k: v for k, v in PAFPN_CFGS[model_type].items()}, 
-                            **{'head_'+k: v for k, v in HEAD_CFGS[model_type].items()}, 
-                            **{k:{"pretrained": v != None} for k,v in PRETRAINED_URLS.items()}[model_type]} 
+                            **{'head_'+k: v for k, v in HEAD_CFGS[model_type].items()}} 
                for model_type in MODEL_TYPES}
 
 # %% ../nbs/00_model.ipynb 11
