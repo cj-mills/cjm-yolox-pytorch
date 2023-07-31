@@ -81,10 +81,18 @@ MODEL_CFGS = {model_type: {**CSP_DARKNET_CFGS[model_type],
                             **{'head_'+k: v for k, v in HEAD_CFGS[model_type].items()}} 
                for model_type in MODEL_TYPES}
 
-# %% ../nbs/00_model.ipynb 12
+# %% ../nbs/00_model.ipynb 11
 class ConvModule(nn.Module):
     """
     Configurable block used for Convolution2d-Normalization-Activation blocks.
+    
+    #### Pseudocode
+    Function forward(input x):
+    
+        1. Pass the input (x) through the convolutional layer and store the result back to x.
+        2. Pass the output from the convolutional layer (now stored in x) through the batch normalization layer and store the result back to x.
+        3. Apply the activation function to the output of the batch normalization layer (x) and return the result.
+
     """
 
     def __init__(self, 
@@ -101,25 +109,25 @@ class ConvModule(nn.Module):
                  activation_function: Type[nn.Module] = nn.SiLU # The activation function to be applied after batch normalization.
                 ):
         
-        super().__init__()
+        super(ConvModule, self).__init__()
 
         # Convolutional layer
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, bias=bias)
         # Batch normalization layer
         self.bn = nn.BatchNorm2d(out_channels, eps=eps, momentum=momentum, affine=affine, track_running_stats=track_running_stats)
-        # Batch normalization layer
+        # Activation function
         self.activate = activation_function()
-
+        
         init.kaiming_normal_(self.conv.weight.data, mode='fan_out', nonlinearity='relu')
 
-        self.layers = nn.Sequential(
-            self.conv,
-            self.bn,
-            self.activate
-        )
-
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.layers(x)
+        
+        # Pass input through convolutional layer
+        x = self.conv(x)
+        # Pass output from convolutional layer through batch normalization
+        x = self.bn(x)
+        # Apply activation function and return result
+        return self.activate(x)
 
 # %% ../nbs/00_model.ipynb 14
 class DarknetBottleneck(nn.Module):
