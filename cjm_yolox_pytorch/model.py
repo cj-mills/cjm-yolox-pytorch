@@ -240,11 +240,16 @@ class CSPLayer(nn.Module):
 
         return self.final_conv(torch.cat((main_path, shortcut_path), dim=1))
 
-# %% ../nbs/00_model.ipynb 21
+# %% ../nbs/00_model.ipynb 20
 class Focus(nn.Module):
     """
     Focus width and height information into channel space.
+    
+    Based on OpenMMLab's implementation in the mmdetection library:
+    
+    - [OpenMMLab's Implementation](https://github.com/open-mmlab/mmdetection/blob/d64e719172335fa3d7a757a2a3636bd19e9efb62/mmdet/models/backbones/csp_darknet.py#L14)
     """
+    
     def __init__(self,
                  in_channels: int, # Number of input channels.
                  out_channels: int, # Number of output channels.
@@ -256,7 +261,8 @@ class Focus(nn.Module):
                  affine: bool = True, # A flag that when set to True, gives the ConvModule's BatchNorm layer learnable affine parameters.
                  track_running_stats: bool = True # Whether or not to track the running mean and variance during training.
                 ):
-        super().__init__()
+        
+        super(Focus, self).__init__()
         self.conv = ConvModule(
             in_channels * 4,
             out_channels,
@@ -267,12 +273,26 @@ class Focus(nn.Module):
             eps=eps,
             momentum=momentum,
             affine=affine,
-            track_running_stats=track_running_stats
-        )
+            track_running_stats=track_running_stats)
 
-    def forward(self, x):
-        B, C, H, W = x.shape
-        x = x.reshape(B, C, H // 2, 2, W // 2, 2).permute(0, 1, 3, 5, 2, 4).reshape(B, 4 * C, H // 2, W // 2)
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+                
+        # Split the input tensor into 4 patches
+        patch_top_left = x[..., ::2, ::2]   # Top left patch
+        patch_top_right = x[..., ::2, 1::2]  # Top right patch
+        patch_bot_left = x[..., 1::2, ::2]  # Bottom left patch
+        patch_bot_right = x[..., 1::2, 1::2]  # Bottom right patch
+        
+        # Concatenate the patches along the channel dimension in order respecting the spatial locality
+        x = torch.cat(
+            (
+                patch_top_left,
+                patch_top_right,
+                patch_bot_left,
+                patch_bot_right,
+            ),
+            dim=1,
+        )
         return self.conv(x)
 
 # %% ../nbs/00_model.ipynb 23
