@@ -58,18 +58,10 @@ PRETRAINED_URLS = {
     MODEL_TYPES[4]:f'{HUGGINGFACE_CKPT_URL}/yolox_x.pth',
 }
 
-# PRETRAINED_URLS = {
-#     MODEL_TYPES[0]:None,
-#     MODEL_TYPES[1]:None,
-#     MODEL_TYPES[2]:None,
-#     MODEL_TYPES[3]:None,
-#     MODEL_TYPES[4]:None,
-# }
-
 NORM_CFG = dict(momentum=0.03, eps=0.001)
 
 NORM_STATS = {
-    MODEL_TYPES[0]:dict(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+    MODEL_TYPES[0]:dict(mean=(0.5, 0.5, 0.5), std=(1.0, 1.0, 1.0)),
     MODEL_TYPES[1]:dict(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
     MODEL_TYPES[2]:dict(mean=(0.5, 0.5, 0.5), std=(1.0, 1.0, 1.0)),
     MODEL_TYPES[3]:dict(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
@@ -183,7 +175,7 @@ class DarknetBottleneck(nn.Module):
 
         return out
 
-# %% ../nbs/00_model.ipynb 16
+# %% ../nbs/00_model.ipynb 15
 class CSPLayer(nn.Module):
     """
     Cross Stage Partial Layer (CSPLayer).
@@ -253,7 +245,7 @@ class CSPLayer(nn.Module):
 
         return self.final_conv(torch.cat((main_path, shortcut_path), dim=1))
 
-# %% ../nbs/00_model.ipynb 18
+# %% ../nbs/00_model.ipynb 17
 class Focus(nn.Module):
     """
     Focus width and height information into channel space.
@@ -308,7 +300,7 @@ class Focus(nn.Module):
         )
         return self.conv(x)
 
-# %% ../nbs/00_model.ipynb 20
+# %% ../nbs/00_model.ipynb 19
 class SPPBottleneck(nn.Module):
     """
     Spatial Pyramid Pooling layer used in YOLOv3-SPP
@@ -353,7 +345,7 @@ class SPPBottleneck(nn.Module):
 
         return self.conv2(x)
 
-# %% ../nbs/00_model.ipynb 22
+# %% ../nbs/00_model.ipynb 21
 class CSPDarknet(nn.Module):
     """
     The `CSPDarknet` class implements a CSPDarknet backbone, a convolutional neural network (CNN) used in various image recognition tasks. The CSPDarknet backbone forms an integral part of the YOLOX object detection model.
@@ -456,7 +448,7 @@ class CSPDarknet(nn.Module):
                 outs.append(x)
         return tuple(outs)
 
-# %% ../nbs/00_model.ipynb 25
+# %% ../nbs/00_model.ipynb 24
 class YOLOXPAFPN(nn.Module):
     """
     Path Aggregation Feature Pyramid Network (PAFPN) used in YOLOX.
@@ -576,7 +568,7 @@ class YOLOXPAFPN(nn.Module):
             outs.append(out)
         return outs
 
-# %% ../nbs/00_model.ipynb 28
+# %% ../nbs/00_model.ipynb 27
 class YOLOXHead(nn.Module):
     """
     The `YOLOXHead` class is a PyTorch module that implements the head of a YOLOX model <https://arxiv.org/abs/2107.08430>, used for bounding box prediction.
@@ -698,7 +690,7 @@ class YOLOXHead(nn.Module):
                            self.multi_level_conv_reg,
                            self.multi_level_conv_obj)
 
-# %% ../nbs/00_model.ipynb 31
+# %% ../nbs/00_model.ipynb 30
 class YOLOX(nn.Module):
     """
     Implementation of `YOLOX: Exceeding YOLO Series in 2021`
@@ -736,7 +728,7 @@ class YOLOX(nn.Module):
 
         return x
 
-# %% ../nbs/00_model.ipynb 34
+# %% ../nbs/00_model.ipynb 33
 def init_head(head: YOLOXHead, # The YOLOX head to be initialized.
               num_classes: int # The number of classes in the dataset.
              ) -> None:
@@ -763,10 +755,10 @@ def init_head(head: YOLOXHead, # The YOLOX head to be initialized.
     
     head.multi_level_conv_cls = nn.ModuleList(conv_layers)
 
-# %% ../nbs/00_model.ipynb 38
+# %% ../nbs/00_model.ipynb 37
 from cjm_psl_utils.core import download_file
 
-# %% ../nbs/00_model.ipynb 39
+# %% ../nbs/00_model.ipynb 38
 def build_model(model_type:str, # Type of the model to be built.
                 num_classes:int, # Number of classes for the model.
                 pretrained:bool=True, # Whether to load pretrained weights.
