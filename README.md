@@ -29,7 +29,11 @@ model_type
 ``` python
 yolox = build_model(model_type, 19, pretrained=True)
 
+print(yolox)
+
 test_inp = torch.randn(1, 3, 256, 256)
+
+print(test_inp)
 
 with torch.no_grad():
     cls_scores, bbox_preds, objectness = yolox(test_inp)
@@ -40,6 +44,446 @@ print(f"objectness: {[objectness.shape for objectness in objectness]}")
 ```
 
     The file ./pretrained_checkpoints/yolox_tiny.pth already exists and overwrite is set to False.
+    YOLOX(
+      (backbone): CSPDarknet(
+        (stem): Focus(
+          (conv): ConvModule(
+            (conv): Conv2d(12, 24, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+            (bn): BatchNorm2d(24, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+            (activate): SiLU()
+          )
+        )
+        (stage1): Sequential(
+          (0): ConvModule(
+            (conv): Conv2d(24, 48, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+            (bn): BatchNorm2d(48, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+            (activate): SiLU()
+          )
+          (1): CSPLayer(
+            (main_conv): ConvModule(
+              (conv): Conv2d(48, 24, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNorm2d(24, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+            (short_conv): ConvModule(
+              (conv): Conv2d(48, 24, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNorm2d(24, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+            (final_conv): ConvModule(
+              (conv): Conv2d(48, 48, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNorm2d(48, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+            (blocks): ModuleList(
+              (0): DarknetBottleneck(
+                (conv1): ConvModule(
+                  (conv): Conv2d(24, 24, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                  (bn): BatchNorm2d(24, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+                  (activate): SiLU()
+                )
+                (conv2): ConvModule(
+                  (conv): Conv2d(24, 24, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                  (bn): BatchNorm2d(24, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+                  (activate): SiLU()
+                )
+                (identity_conv): Identity()
+              )
+            )
+          )
+        )
+        (stage2): Sequential(
+          (0): ConvModule(
+            (conv): Conv2d(48, 96, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+            (bn): BatchNorm2d(96, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+            (activate): SiLU()
+          )
+          (1): CSPLayer(
+            (main_conv): ConvModule(
+              (conv): Conv2d(96, 48, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNorm2d(48, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+            (short_conv): ConvModule(
+              (conv): Conv2d(96, 48, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNorm2d(48, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+            (final_conv): ConvModule(
+              (conv): Conv2d(96, 96, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNorm2d(96, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+            (blocks): ModuleList(
+              (0-2): 3 x DarknetBottleneck(
+                (conv1): ConvModule(
+                  (conv): Conv2d(48, 48, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                  (bn): BatchNorm2d(48, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+                  (activate): SiLU()
+                )
+                (conv2): ConvModule(
+                  (conv): Conv2d(48, 48, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                  (bn): BatchNorm2d(48, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+                  (activate): SiLU()
+                )
+                (identity_conv): Identity()
+              )
+            )
+          )
+        )
+        (stage3): Sequential(
+          (0): ConvModule(
+            (conv): Conv2d(96, 192, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+            (bn): BatchNorm2d(192, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+            (activate): SiLU()
+          )
+          (1): CSPLayer(
+            (main_conv): ConvModule(
+              (conv): Conv2d(192, 96, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNorm2d(96, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+            (short_conv): ConvModule(
+              (conv): Conv2d(192, 96, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNorm2d(96, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+            (final_conv): ConvModule(
+              (conv): Conv2d(192, 192, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNorm2d(192, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+            (blocks): ModuleList(
+              (0-2): 3 x DarknetBottleneck(
+                (conv1): ConvModule(
+                  (conv): Conv2d(96, 96, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                  (bn): BatchNorm2d(96, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+                  (activate): SiLU()
+                )
+                (conv2): ConvModule(
+                  (conv): Conv2d(96, 96, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                  (bn): BatchNorm2d(96, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+                  (activate): SiLU()
+                )
+                (identity_conv): Identity()
+              )
+            )
+          )
+        )
+        (stage4): Sequential(
+          (0): ConvModule(
+            (conv): Conv2d(192, 384, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+            (bn): BatchNorm2d(384, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+            (activate): SiLU()
+          )
+          (1): SPPBottleneck(
+            (conv1): ConvModule(
+              (conv): Conv2d(384, 192, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNorm2d(192, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+            (pooling_layers): ModuleList(
+              (0): MaxPool2d(kernel_size=5, stride=1, padding=2, dilation=1, ceil_mode=False)
+              (1): MaxPool2d(kernel_size=9, stride=1, padding=4, dilation=1, ceil_mode=False)
+              (2): MaxPool2d(kernel_size=13, stride=1, padding=6, dilation=1, ceil_mode=False)
+            )
+            (conv2): ConvModule(
+              (conv): Conv2d(768, 384, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNorm2d(384, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+          )
+          (2): CSPLayer(
+            (main_conv): ConvModule(
+              (conv): Conv2d(384, 192, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNorm2d(192, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+            (short_conv): ConvModule(
+              (conv): Conv2d(384, 192, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNorm2d(192, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+            (final_conv): ConvModule(
+              (conv): Conv2d(384, 384, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNorm2d(384, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+            (blocks): ModuleList(
+              (0): DarknetBottleneck(
+                (conv1): ConvModule(
+                  (conv): Conv2d(192, 192, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                  (bn): BatchNorm2d(192, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+                  (activate): SiLU()
+                )
+                (conv2): ConvModule(
+                  (conv): Conv2d(192, 192, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                  (bn): BatchNorm2d(192, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+                  (activate): SiLU()
+                )
+                (identity_conv): Identity()
+              )
+            )
+          )
+        )
+      )
+      (neck): YOLOXPAFPN(
+        (upsample): Upsample(scale_factor=2.0, mode='nearest')
+        (reduce_layers): ModuleList(
+          (0): ConvModule(
+            (conv): Conv2d(384, 192, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            (bn): BatchNorm2d(192, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+            (activate): SiLU()
+          )
+          (1): ConvModule(
+            (conv): Conv2d(192, 96, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            (bn): BatchNorm2d(96, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+            (activate): SiLU()
+          )
+        )
+        (top_down_blocks): ModuleList(
+          (0): CSPLayer(
+            (main_conv): ConvModule(
+              (conv): Conv2d(384, 96, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNorm2d(96, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+            (short_conv): ConvModule(
+              (conv): Conv2d(384, 96, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNorm2d(96, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+            (final_conv): ConvModule(
+              (conv): Conv2d(192, 192, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNorm2d(192, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+            (blocks): ModuleList(
+              (0): DarknetBottleneck(
+                (conv1): ConvModule(
+                  (conv): Conv2d(96, 96, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                  (bn): BatchNorm2d(96, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+                  (activate): SiLU()
+                )
+                (conv2): ConvModule(
+                  (conv): Conv2d(96, 96, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                  (bn): BatchNorm2d(96, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+                  (activate): SiLU()
+                )
+                (identity_conv): Identity()
+              )
+            )
+          )
+          (1): CSPLayer(
+            (main_conv): ConvModule(
+              (conv): Conv2d(192, 48, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNorm2d(48, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+            (short_conv): ConvModule(
+              (conv): Conv2d(192, 48, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNorm2d(48, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+            (final_conv): ConvModule(
+              (conv): Conv2d(96, 96, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNorm2d(96, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+            (blocks): ModuleList(
+              (0): DarknetBottleneck(
+                (conv1): ConvModule(
+                  (conv): Conv2d(48, 48, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                  (bn): BatchNorm2d(48, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+                  (activate): SiLU()
+                )
+                (conv2): ConvModule(
+                  (conv): Conv2d(48, 48, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                  (bn): BatchNorm2d(48, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+                  (activate): SiLU()
+                )
+                (identity_conv): Identity()
+              )
+            )
+          )
+        )
+        (downsamples): ModuleList(
+          (0): ConvModule(
+            (conv): Conv2d(96, 96, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+            (bn): BatchNorm2d(96, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+            (activate): SiLU()
+          )
+          (1): ConvModule(
+            (conv): Conv2d(192, 192, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+            (bn): BatchNorm2d(192, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+            (activate): SiLU()
+          )
+        )
+        (bottom_up_blocks): ModuleList(
+          (0): CSPLayer(
+            (main_conv): ConvModule(
+              (conv): Conv2d(192, 96, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNorm2d(96, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+            (short_conv): ConvModule(
+              (conv): Conv2d(192, 96, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNorm2d(96, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+            (final_conv): ConvModule(
+              (conv): Conv2d(192, 192, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNorm2d(192, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+            (blocks): ModuleList(
+              (0): DarknetBottleneck(
+                (conv1): ConvModule(
+                  (conv): Conv2d(96, 96, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                  (bn): BatchNorm2d(96, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+                  (activate): SiLU()
+                )
+                (conv2): ConvModule(
+                  (conv): Conv2d(96, 96, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                  (bn): BatchNorm2d(96, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+                  (activate): SiLU()
+                )
+                (identity_conv): Identity()
+              )
+            )
+          )
+          (1): CSPLayer(
+            (main_conv): ConvModule(
+              (conv): Conv2d(384, 192, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNorm2d(192, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+            (short_conv): ConvModule(
+              (conv): Conv2d(384, 192, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNorm2d(192, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+            (final_conv): ConvModule(
+              (conv): Conv2d(384, 384, kernel_size=(1, 1), stride=(1, 1), bias=False)
+              (bn): BatchNorm2d(384, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+            (blocks): ModuleList(
+              (0): DarknetBottleneck(
+                (conv1): ConvModule(
+                  (conv): Conv2d(192, 192, kernel_size=(1, 1), stride=(1, 1), bias=False)
+                  (bn): BatchNorm2d(192, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+                  (activate): SiLU()
+                )
+                (conv2): ConvModule(
+                  (conv): Conv2d(192, 192, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+                  (bn): BatchNorm2d(192, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+                  (activate): SiLU()
+                )
+                (identity_conv): Identity()
+              )
+            )
+          )
+        )
+        (out_convs): ModuleList(
+          (0): ConvModule(
+            (conv): Conv2d(96, 96, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            (bn): BatchNorm2d(96, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+            (activate): SiLU()
+          )
+          (1): ConvModule(
+            (conv): Conv2d(192, 96, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            (bn): BatchNorm2d(96, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+            (activate): SiLU()
+          )
+          (2): ConvModule(
+            (conv): Conv2d(384, 96, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            (bn): BatchNorm2d(96, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+            (activate): SiLU()
+          )
+        )
+      )
+      (bbox_head): YOLOXHead(
+        (multi_level_cls_convs): ModuleList(
+          (0-2): 3 x Sequential(
+            (0): ConvModule(
+              (conv): Conv2d(96, 96, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+              (bn): BatchNorm2d(96, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+            (1): ConvModule(
+              (conv): Conv2d(96, 96, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+              (bn): BatchNorm2d(96, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+          )
+        )
+        (multi_level_reg_convs): ModuleList(
+          (0-2): 3 x Sequential(
+            (0): ConvModule(
+              (conv): Conv2d(96, 96, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+              (bn): BatchNorm2d(96, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+            (1): ConvModule(
+              (conv): Conv2d(96, 96, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+              (bn): BatchNorm2d(96, eps=0.001, momentum=0.03, affine=True, track_running_stats=True)
+              (activate): SiLU()
+            )
+          )
+        )
+        (multi_level_conv_cls): ModuleList(
+          (0-2): 3 x Conv2d(96, 19, kernel_size=(1, 1), stride=(1, 1))
+        )
+        (multi_level_conv_reg): ModuleList(
+          (0-2): 3 x Conv2d(96, 4, kernel_size=(1, 1), stride=(1, 1))
+        )
+        (multi_level_conv_obj): ModuleList(
+          (0-2): 3 x Conv2d(96, 1, kernel_size=(1, 1), stride=(1, 1))
+        )
+      )
+    )
+    tensor([[[[-5.3644e-01, -3.0695e-01, -1.4810e+00,  ...,  9.6595e-01,
+                6.7531e-01, -2.7702e+00],
+              [ 3.2885e-01,  7.7835e-01, -1.4924e+00,  ..., -5.2897e-01,
+               -1.6283e+00, -1.8625e-01],
+              [ 2.2971e+00, -8.0851e-01,  1.5937e+00,  ..., -1.2534e+00,
+                6.0570e-01,  6.4935e-01],
+              ...,
+              [ 6.4563e-01, -2.5578e-01,  6.9315e-01,  ...,  2.9768e-01,
+               -3.9155e-01,  2.4528e-01],
+              [-1.3413e+00, -1.5478e+00,  9.2080e-02,  ...,  1.2769e-01,
+                1.9392e-01,  1.2523e+00],
+              [-3.4348e-01, -9.9970e-01, -1.2541e-01,  ...,  5.2251e-01,
+                6.0599e-02,  2.8243e-01]],
+
+             [[ 4.0949e-01, -6.2654e-01, -1.5848e+00,  ...,  4.3600e-01,
+               -5.9007e-01, -6.2642e-01],
+              [ 1.5201e-04,  1.6551e-01,  1.6516e+00,  ..., -9.1843e-01,
+                1.1340e-01, -1.3367e+00],
+              [-5.9582e-01,  1.4851e+00, -4.6225e-02,  ...,  2.9473e-02,
+                3.7452e-01,  4.6478e-01],
+              ...,
+              [ 1.6931e+00,  2.2474e+00, -1.0674e+00,  ...,  3.9885e-01,
+               -1.1472e+00, -6.6963e-02],
+              [-6.2105e-01, -5.1009e-01,  5.5264e-02,  ..., -1.3495e-01,
+               -1.5810e+00,  1.1983e+00],
+              [ 8.3206e-01,  6.2784e-01,  7.7197e-02,  ...,  6.4545e-01,
+               -1.7326e-02, -5.0243e-01]],
+
+             [[-1.2719e+00,  6.3586e-01, -1.3811e-01,  ..., -8.0585e-01,
+                6.8099e-01,  8.6517e-01],
+              [-6.5518e-01, -9.8268e-01,  2.2988e+00,  ...,  9.3786e-01,
+               -2.3960e-01, -1.4282e+00],
+              [-1.3564e+00,  6.1061e-01,  9.7514e-01,  ...,  2.9731e+00,
+                4.0509e-01, -5.8319e-01],
+              ...,
+              [-1.6337e-02, -1.0698e+00,  6.9350e-01,  ..., -1.0073e+00,
+               -2.1847e+00, -9.3447e-01],
+              [ 1.9642e+00,  4.0131e-01, -1.6268e-02,  ...,  5.0666e-01,
+               -1.2747e+00,  1.4928e+00],
+              [-1.6794e-01,  7.8074e-02, -9.6174e-01,  ..., -1.7776e+00,
+                3.2766e-01, -4.4341e-01]]]])
     cls_scores: [torch.Size([1, 19, 32, 32]), torch.Size([1, 19, 16, 16]), torch.Size([1, 19, 8, 8])]
     bbox_preds: [torch.Size([1, 4, 32, 32]), torch.Size([1, 4, 16, 16]), torch.Size([1, 4, 8, 8])]
     objectness: [torch.Size([1, 1, 32, 32]), torch.Size([1, 1, 16, 16]), torch.Size([1, 1, 8, 8])]
