@@ -40,6 +40,6 @@ print(f"objectness: {[objectness.shape for objectness in objectness]}")
 ```
 
     The file ./pretrained_checkpoints/yolox_tiny.pth already exists and overwrite is set to False.
-    Error occurred while building the model: Attempting to deserialize object on a CUDA device but torch.cuda.is_available() is False. If you are running on a CPU-only machine, please use torch.load with map_location=torch.device('cpu') to map your storages to the CPU.
-
-    TypeError: 'NoneType' object is not callable
+    cls_scores: [torch.Size([1, 19, 32, 32]), torch.Size([1, 19, 16, 16]), torch.Size([1, 19, 8, 8])]
+    bbox_preds: [torch.Size([1, 4, 32, 32]), torch.Size([1, 4, 16, 16]), torch.Size([1, 4, 8, 8])]
+    objectness: [torch.Size([1, 1, 32, 32]), torch.Size([1, 1, 16, 16]), torch.Size([1, 1, 8, 8])]
