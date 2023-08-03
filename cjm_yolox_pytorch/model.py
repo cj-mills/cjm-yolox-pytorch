@@ -787,7 +787,7 @@ def build_model(model_type:str, # Type of the model to be built.
             checkpoint_path = os.path.join(checkpoint_dir, Path(url).name)
             download_file(url, checkpoint_dir)
             
-            state_dict = torch.load(checkpoint_path)
+            state_dict = torch.load(checkpoint_path, map_location='cpu')
             num_pretrained_classes = state_dict['bbox_head.multi_level_conv_cls.0.weight'].shape[0]
             
             head = YOLOXHead(num_classes=num_pretrained_classes, **head_cfg)
