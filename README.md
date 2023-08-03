@@ -11,6 +11,7 @@ pip install cjm_yolox_pytorch
 ## How to use
 
 ``` python
+import torch
 from cjm_yolox_pytorch.model import MODEL_TYPES, build_model
 ```
 
@@ -26,9 +27,7 @@ model_type
 **Build YOLOX model**
 
 ``` python
-import torch
-
-yolox = build_model(model_type, 19)
+yolox = build_model(model_type, 19, pretrained=True)
 
 test_inp = torch.randn(1, 3, 256, 256)
 
@@ -40,8 +39,7 @@ print(f"bbox_preds: {[bbox_pred.shape for bbox_pred in bbox_preds]}")
 print(f"objectness: {[objectness.shape for objectness in objectness]}")
 ```
 
-      0%|          | 0.00/20.5M [00:00<?, ?iB/s]
-
+    The file ./pretrained_checkpoints/yolox_tiny.pth already exists and overwrite is set to False.
     cls_scores: [torch.Size([1, 19, 32, 32]), torch.Size([1, 19, 16, 16]), torch.Size([1, 19, 8, 8])]
     bbox_preds: [torch.Size([1, 4, 32, 32]), torch.Size([1, 4, 16, 16]), torch.Size([1, 4, 8, 8])]
     objectness: [torch.Size([1, 1, 32, 32]), torch.Size([1, 1, 16, 16]), torch.Size([1, 1, 8, 8])]
