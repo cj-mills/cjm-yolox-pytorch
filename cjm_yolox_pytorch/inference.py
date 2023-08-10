@@ -29,8 +29,8 @@ class YOLOXInferenceWrapper(nn.Module):
 
     def __init__(self, 
                  model:nn.Module, # The YOLOX model.
-                 normalize_mean:torch.Tensor=torch.tensor([[[0]]]*3)[None], # The mean values for normalization.
-                 normalize_std:torch.Tensor=torch.tensor([[[1]]]*3)[None], # The standard deviation values for normalization.
+                 normalize_mean:torch.Tensor=torch.tensor([[[0.]]]*3)[None], # The mean values for normalization.
+                 normalize_std:torch.Tensor=torch.tensor([[[1.]]]*3)[None], # The standard deviation values for normalization.
                  strides:Optional[List[int]]=[8, 16, 32], # The strides for the model.
                  scale_inp:bool=False, # Whether to scale the input by dividing by 255.
                  channels_first:bool=False, # Whether the input tensor has channels first.
