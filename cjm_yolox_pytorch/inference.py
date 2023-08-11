@@ -47,6 +47,7 @@ class YOLOXInferenceWrapper(nn.Module):
         self.channels_last = channels_last
         self.register_buffer("strides", torch.tensor(strides))
         self.run_box_and_prob_calculation = run_box_and_prob_calculation
+        self.input_dim_slice = slice(1, -1) if self.channels_last else slice(-2, None)
 
     def preprocess_input(self, x):
         """
@@ -136,7 +137,7 @@ class YOLOXInferenceWrapper(nn.Module):
         torch.Tensor: The output tensor.
         """
         
-        input_dims = x.shape[1:-1] if self.channels_last else x.shape[-2:]
+        input_dims = x.shape[self.input_dim_slice]
                 
         # Preprocess the input
         x = self.preprocess_input(x)
