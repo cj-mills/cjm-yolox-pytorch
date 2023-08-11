@@ -33,7 +33,7 @@ class YOLOXInferenceWrapper(nn.Module):
                  normalize_std:torch.Tensor=torch.tensor([[[1.]]]*3)[None], # The standard deviation values for normalization.
                  strides:Optional[List[int]]=[8, 16, 32], # The strides for the model.
                  scale_inp:bool=False, # Whether to scale the input by dividing by 255.
-                 channels_first:bool=False, # Whether the input tensor has channels first.
+                 channels_last:bool=False, # Whether the input tensor has channels first.
                  run_box_and_prob_calculation:bool=True # Whether to calculate the bounding boxes and their probabilities.
                 ):
         """
@@ -44,7 +44,7 @@ class YOLOXInferenceWrapper(nn.Module):
         self.register_buffer("normalize_mean", normalize_mean)
         self.register_buffer("normalize_std", normalize_std)
         self.scale_inp = scale_inp
-        self.channels_first = channels_first
+        self.channels_last = channels_last
         self.register_buffer("strides", torch.tensor(strides))
         self.run_box_and_prob_calculation = run_box_and_prob_calculation
 
@@ -63,7 +63,7 @@ class YOLOXInferenceWrapper(nn.Module):
             x = x / 255.0
 
         # Permute the dimensions of the input to bring the channels to the front if required
-        if self.channels_first:
+        if self.channels_last:
             x = x.permute(0, 3, 1, 2)
 
         # Normalize the input
@@ -136,7 +136,7 @@ class YOLOXInferenceWrapper(nn.Module):
         torch.Tensor: The output tensor.
         """
         
-        input_dims = x.shape[-2:]
+        input_dims = x.shape[1:-1] if self.channels_last else x.shape[-2:]
                 
         # Preprocess the input
         x = self.preprocess_input(x)
